@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ko">
+  <head>
+    <script>
+      (function () {
+        try {
+          var k = 'theme-preference'
+          var t = localStorage.getItem(k)
+          if (t === 'dark') document.documentElement.classList.add('dark')
+          else if (t === 'light') document.documentElement.classList.remove('dark')
+          else if (window.matchMedia('(prefers-color-scheme: dark)').matches)
+            document.documentElement.classList.add('dark')
+        } catch (e) {}
+      })()
+    </script>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>면접 질문 코파일럿</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html>
