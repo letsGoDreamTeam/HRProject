@@ -47,11 +47,6 @@ function directLocalBackendOrigin() {
   return `${proto}//${apiHost}:${apiPort}`
 }
 
-/** 에러 안내용 (기록 페이지 등) */
-export function getDefaultBackendBaseForUi() {
-  return directLocalBackendOrigin()
-}
-
 function getApiBase() {
   const raw = import.meta.env.VITE_API_BASE_URL
   let base = normalizeApiBase(raw)
@@ -92,114 +87,6 @@ async function parseError(res) {
     /* ignore */
   }
   return res.statusText || '요청 실패'
-}
-
-export async function extractJdFromPdf(file) {
-  const fd = new FormData()
-  fd.append('file', file)
-  const res = await fetch(apiUrl('/api/jd/from-pdf'), {
-    method: 'POST',
-    body: fd,
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function analyzeJd(jdText) {
-  const res = await fetch(apiUrl('/api/analyze'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jd_text: jdText }),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function analyzeAndSave(jdText) {
-  const res = await fetch(apiUrl('/api/analyze/save'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ jd_text: jdText }),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function fetchHistory(limit = 20) {
-  const res = await fetch(apiUrl(`/api/history?limit=${limit}`))
-  if (!res.ok) throw new Error(`${await parseError(res)} (HTTP ${res.status})`)
-  return res.json()
-}
-
-export async function fetchHistoryItem(id) {
-  const res = await fetch(apiUrl(`/api/history/${id}`))
-  if (!res.ok) throw new Error(`${await parseError(res)} (HTTP ${res.status})`)
-  return res.json()
-}
-
-/** --- A-PASS --- */
-export async function apassParseRecord({ file, fullText }) {
-  const fd = new FormData()
-  if (file) fd.append('file', file)
-  if (fullText) fd.append('full_text', fullText)
-  const res = await fetch(apiUrl('/api/apass/parse-record'), {
-    method: 'POST',
-    body: fd,
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassIngestUniversity(body) {
-  const res = await fetch(apiUrl('/api/apass/ingest-university'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassAnalyzeFit(body) {
-  const res = await fetch(apiUrl('/api/apass/analyze-fit'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassInterviewStart(body) {
-  const res = await fetch(apiUrl('/api/apass/interview/start'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassInterviewTurn(body) {
-  const res = await fetch(apiUrl('/api/apass/interview/turn'), {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassDashboardStudent() {
-  const res = await fetch(apiUrl('/api/apass/dashboard/student'))
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
-}
-
-export async function apassDashboardInstitution() {
-  const res = await fetch(apiUrl('/api/apass/dashboard/institution'))
-  if (!res.ok) throw new Error(await parseError(res))
-  return res.json()
 }
 
 /** --- HR (인증·채용 운영) --- 토큰은 sessionStorage (탭 닫으면 로그아웃) */
@@ -251,10 +138,6 @@ export async function hrLogout() {
   }
 }
 
-export async function hrDeleteAccount(password) {
-  return hrJson('/api/hr/auth/delete-account', { method: 'POST', body: { password } })
-}
-
 export async function hrMe() {
   return hrJson('/api/hr/auth/me')
 }
@@ -304,6 +187,10 @@ export async function hrJobRolesDelete(id) {
   return hrJson(`/api/hr/job-roles/${id}`, { method: 'DELETE' })
 }
 
+export async function hrJobRolesPatchHeadcount(id, headcountTo) {
+  return hrJson(`/api/hr/job-roles/${id}/headcount`, { method: 'PATCH', body: { headcount_to: headcountTo } })
+}
+
 export async function hrJobRolesRagSearch(query, topK = 8) {
   const q = encodeURIComponent(query || '')
   return hrJson(`/api/hr/job-roles/rag-search?query=${q}&top_k=${topK}`)
@@ -313,10 +200,34 @@ export async function hrListApplicationBatches() {
   return hrJson('/api/hr/applications/batches')
 }
 
-export async function hrCreateApplicationBatch({ title, jdPreferredText, files }) {
+export async function hrCreateApplicationBatch({
+  title,
+  jdPreferredText,
+  files,
+  jobRoleId,
+  employerSector,
+  preferredIncludePatterns,
+  preferredExcludePatterns,
+  preferredRequiresEvidence,
+  departmentName,
+  positionName,
+  postingPlatform,
+  postedAt,
+  deadlineAt,
+}) {
   const fd = new FormData()
   fd.append('title', title || '지원서 분류')
   fd.append('jd_preferred_text', jdPreferredText || '')
+  fd.append('employer_sector', employerSector === 'private' ? 'private' : 'public')
+  fd.append('preferred_include_patterns', preferredIncludePatterns || '')
+  fd.append('preferred_exclude_patterns', preferredExcludePatterns || '')
+  fd.append('preferred_requires_evidence', preferredRequiresEvidence ? 'true' : 'false')
+  fd.append('department_name', departmentName || '')
+  fd.append('position_name', positionName || '')
+  fd.append('posting_platform', postingPlatform || '')
+  if (postedAt) fd.append('posted_at', postedAt)
+  if (deadlineAt) fd.append('deadline_at', deadlineAt)
+  if (jobRoleId) fd.append('job_role_id', String(jobRoleId))
   for (const f of files || []) fd.append('files', f)
   const res = await fetch(apiUrl('/api/hr/applications/batches'), {
     method: 'POST',
@@ -331,6 +242,36 @@ export async function hrGetApplicationBatch(id) {
   return hrJson(`/api/hr/applications/batches/${id}`)
 }
 
+export async function hrPatchApplicationBatch(batchId, body) {
+  return hrJson(`/api/hr/applications/batches/${batchId}`, { method: 'PATCH', body })
+}
+
+export async function hrRecruitmentSummary() {
+  return hrJson('/api/hr/applications/recruitment/summary')
+}
+
+export async function hrApplicantStatusDashboard() {
+  return hrJson('/api/hr/applications/dashboard/applicant-status')
+}
+
+export async function hrBatchResumeInsights(batchId) {
+  return hrJson(`/api/hr/applications/batches/${batchId}/insights`)
+}
+
+export async function hrDownloadBatchResumeInsightsExcel(batchId) {
+  const res = await fetch(apiUrl(`/api/hr/applications/batches/${batchId}/insights.xlsx`), {
+    headers: { ...hrAuthHeaders() },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `batch_${batchId}_insights.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export async function hrRunApplicationBatch(id) {
   return hrJson(`/api/hr/applications/batches/${id}/run`, { method: 'POST' })
 }
@@ -341,6 +282,27 @@ export async function hrStandardizeApplicationBatch(id) {
 
 export async function hrApplicationDedupeScan(id) {
   return hrJson(`/api/hr/applications/batches/${id}/dedupe`)
+}
+
+export async function hrCandidateDedupeReview(batchId) {
+  const q = batchId ? `?batch_id=${encodeURIComponent(batchId)}` : ''
+  return hrJson(`/api/hr/applications/dedupe/review${q}`)
+}
+
+export async function hrCandidateDedupeMerge(payload) {
+  return hrJson('/api/hr/applications/dedupe/merge', { method: 'POST', body: payload })
+}
+
+export async function hrCandidateDedupeSeparate(payload) {
+  return hrJson('/api/hr/applications/dedupe/separate', { method: 'POST', body: payload })
+}
+
+export async function hrCandidateMasters() {
+  return hrJson('/api/hr/applications/dedupe/candidates')
+}
+
+export async function hrCandidateDedupeLogs(limit = 50) {
+  return hrJson(`/api/hr/applications/dedupe/logs?limit=${Math.max(1, Number(limit) || 50)}`)
 }
 
 export async function hrUpdateApplicationStage(itemId, stage) {
@@ -369,6 +331,33 @@ export async function hrDownloadStandardizedResumeText(itemId) {
   URL.revokeObjectURL(url)
 }
 
+/** mode: 'text' 표준화·추출 텍스트 PDF | 'source' 원본(docx/rtf 등) LibreOffice→PDF */
+export async function hrDownloadApplicationItemPdf(itemId, mode = 'text') {
+  const q = encodeURIComponent(mode)
+  const res = await fetch(apiUrl(`/api/hr/applications/items/${itemId}/export.pdf?mode=${q}`), {
+    headers: { ...hrAuthHeaders() },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `resume_${itemId}.pdf`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+/** 인증 헤더로 PDF를 받아 뷰어용 blob URL 반환 (사용 후 revoke 필요) */
+export async function hrGetApplicationItemPdfBlobUrl(itemId, mode = 'text') {
+  const q = encodeURIComponent(mode)
+  const res = await fetch(apiUrl(`/api/hr/applications/items/${itemId}/export.pdf?mode=${q}`), {
+    headers: { ...hrAuthHeaders() },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  const blob = await res.blob()
+  return URL.createObjectURL(blob)
+}
+
 export async function hrDownloadApplicationBatchExcel(batchId) {
   const res = await fetch(apiUrl(`/api/hr/applications/batches/${batchId}/export.xlsx`), {
     headers: { ...hrAuthHeaders() },
@@ -379,6 +368,20 @@ export async function hrDownloadApplicationBatchExcel(batchId) {
   const a = document.createElement('a')
   a.href = url
   a.download = `applications_${batchId}.xlsx`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
+export async function hrDownloadApplicationBatchPdfZip(batchId) {
+  const res = await fetch(apiUrl(`/api/hr/applications/batches/${batchId}/export-all-pdf.zip`), {
+    headers: { ...hrAuthHeaders() },
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  const blob = await res.blob()
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `applications_${batchId}_pdf_bundle.zip`
   a.click()
   URL.revokeObjectURL(url)
 }
@@ -461,6 +464,15 @@ export async function hrPublicCancelBooking(token) {
   return res.json()
 }
 
+/** 면접 참석 불가 응답(예약 취소 + 파이프라인 반영은 백엔드에서 처리) */
+export async function hrPublicDeclineInterview(token) {
+  const res = await fetch(apiUrl(`/api/public/schedule/${encodeURIComponent(token)}/decline`), {
+    method: 'POST',
+  })
+  if (!res.ok) throw new Error(await parseError(res))
+  return res.json()
+}
+
 export async function hrPublicEvaluation(token) {
   const res = await fetch(apiUrl(`/api/public/evaluation/${encodeURIComponent(token)}`))
   if (!res.ok) throw new Error(await parseError(res))
@@ -485,6 +497,11 @@ export async function hrAdminPatchUser(userId, payload) {
   return hrJson(`/api/hr/admin/users/${userId}`, { method: 'PATCH', body: payload })
 }
 
+/** 최고 관리자(또는 HR_SUPER_ADMIN_EMAILS 미설정 시 모든 관리자): 다른 계정 삭제 */
+export async function hrAdminDeleteUser(userId) {
+  return hrJson(`/api/hr/admin/users/${userId}`, { method: 'DELETE' })
+}
+
 /** 이메일로 관리자 권한 부여·해지 payload: { email, is_admin: true|false } */
 export async function hrAdminPatchUserByEmail(payload) {
   return hrJson('/api/hr/admin/users/by-email', { method: 'PATCH', body: payload })
@@ -506,10 +523,47 @@ export async function hrAdminRetryNotification(id) {
   return hrJson(`/api/hr/admin/notifications/${id}/retry`, { method: 'POST' })
 }
 
+export async function hrAdminTokenUsageSummary(days = 7) {
+  const q = Math.max(1, Number(days) || 7)
+  return hrJson(`/api/hr/admin/token-usage/summary?days=${q}`)
+}
+
 export async function hrCandidateQuestions(body) {
   return hrJson('/api/hr/interviews/candidate-questions', { method: 'POST', body })
 }
 
 export async function hrSendRejections(body) {
   return hrJson('/api/hr/rejections/send', { method: 'POST', body })
+}
+
+// ── 합격 알림 이메일 ───────────────────────────────────────────
+export async function hrGenConfirmUrl(itemId, siteBaseUrl) {
+  return hrJson(`/api/hr/applications/items/${itemId}/gen-confirm-url`, {
+    method: 'POST',
+    body: { site_base_url: siteBaseUrl },
+  })
+}
+
+export async function hrSendStagePassNotify(itemId, payload) {
+  return hrJson(`/api/hr/applications/items/${itemId}/pass-notify`, {
+    method: 'POST',
+    body: payload,
+  })
+}
+
+// ── 채용 절차 설정 ─────────────────────────────────────────────
+export async function hrListRecruitmentProcess() {
+  return hrJson('/api/hr/recruitment-process')
+}
+
+export async function hrCreateRecruitmentProcess(payload) {
+  return hrJson('/api/hr/recruitment-process', { method: 'POST', body: payload })
+}
+
+export async function hrPatchRecruitmentProcess(id, payload) {
+  return hrJson(`/api/hr/recruitment-process/${id}`, { method: 'PATCH', body: payload })
+}
+
+export async function hrDeleteRecruitmentProcess(id) {
+  return hrJson(`/api/hr/recruitment-process/${id}`, { method: 'DELETE' })
 }

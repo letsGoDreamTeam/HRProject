@@ -8,6 +8,7 @@ from typing import Any
 from openai import OpenAI
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 SYSTEM = """당신은 해당 부서의 면접관을 돕는 시니어 HRBP입니다.
 입력된 회사·직무 맥락, 지원 부서, 지원서/포트폴리오 내용을 바탕으로 **한국어** 면접 질문만 생성합니다.
@@ -69,6 +70,12 @@ def generate_candidate_questions(
             {"role": "user", "content": user_payload},
         ],
         response_format={"type": "json_schema", "json_schema": SCHEMA},
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=settings.openai_model,
+        feature="candidate_interview_questions",
+        request_kind="chat",
     )
     raw = completion.choices[0].message.content
     if not raw:

@@ -11,6 +11,7 @@ from langgraph.graph import END, StateGraph
 from openai import OpenAI
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 EXTRACT_SYSTEM = """당신은 공공기관·대기업의 '통합 직무소개서' 또는 대규모 채용 안내 PDF를 구조화하는 전문가입니다.
 입력은 **문서의 일부(한 청크)**일 수 있습니다. 이 청크 안에 등장하는 **모든 직무(또는 직렬)**를 빠짐없이 찾아 목록으로 만듭니다.
@@ -69,6 +70,12 @@ def _extract_chunk(client: OpenAI, model: str, chunk: str) -> tuple[list[dict[st
             {"role": "user", "content": "[문서 청크]\n" + chunk},
         ],
         response_format={"type": "json_schema", "json_schema": EXTRACT_SCHEMA},
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=model,
+        feature="hr_job_pdf_extract_chunk",
+        request_kind="chat",
     )
     raw = completion.choices[0].message.content
     if not raw:

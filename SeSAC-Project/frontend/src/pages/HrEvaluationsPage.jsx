@@ -17,7 +17,9 @@ function criteriaFromLines(text) {
 
 export function HrEvaluationsPage() {
   const { roundId } = useParams()
-  const [criteriaText, setCriteriaText] = useState('커뮤니케이션\n문제해결\n직무 이해도')
+  const [criteriaText, setCriteriaText] = useState(
+    '직무적합도\n경험/성과\n커뮤니케이션\n조직적합도',
+  )
   const [status, setStatus] = useState(null)
   const [aggregate, setAggregate] = useState(null)
   const [aggCandidateId, setAggCandidateId] = useState('')
@@ -131,7 +133,7 @@ export function HrEvaluationsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">면접 평가표</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            지원자·면접관 조합별 링크 생성, 제출 현황·미제출 알림, 지원자별 점수·코멘트 집계.
+            지원자·면접관 조합별 링크 생성, 제출 현황·미제출 알림, 지원자별 점수·항목별 코멘트·합격/보류/불합격 집계.
           </p>
         </div>
         <Link to="/hr/schedules" className="text-sm text-violet-600 hover:underline dark:text-violet-400">
@@ -287,9 +289,39 @@ export function HrEvaluationsPage() {
                         </li>
                       ))}
                     </ul>
+                    {sub.final_summary_line ? (
+                      <p className="mt-2 text-sm font-medium text-slate-800 dark:text-slate-200">
+                        한 줄 요약: {sub.final_summary_line}
+                      </p>
+                    ) : null}
+                    {sub.recommendation ? (
+                      <p className="mt-1 text-xs text-violet-700 dark:text-violet-300">
+                        추천:{' '}
+                        {sub.recommendation === 'pass'
+                          ? '합격'
+                          : sub.recommendation === 'hold'
+                            ? '보류'
+                            : sub.recommendation === 'fail'
+                              ? '불합격'
+                              : sub.recommendation}
+                      </p>
+                    ) : null}
+                    {sub.criteria_comments && Object.keys(sub.criteria_comments).length > 0 ? (
+                      <div className="mt-2 rounded border border-slate-100 p-2 text-xs dark:border-slate-800">
+                        <p className="font-medium text-slate-700 dark:text-slate-300">항목별 코멘트</p>
+                        <ul className="mt-1 space-y-1">
+                          {Object.entries(sub.criteria_comments).map(([k, v]) => (
+                            <li key={k}>
+                              <span className="font-medium">{k}</span>:{' '}
+                              <span className="whitespace-pre-wrap text-slate-600 dark:text-slate-400">{v}</span>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
                     {sub.overall_comment ? (
                       <p className="mt-2 whitespace-pre-wrap text-slate-700 dark:text-slate-300">
-                        {sub.overall_comment}
+                        추가 코멘트: {sub.overall_comment}
                       </p>
                     ) : null}
                   </div>

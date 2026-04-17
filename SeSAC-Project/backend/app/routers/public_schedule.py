@@ -13,6 +13,7 @@ from app.models_hr import (
     InterviewSlot,
 )
 from app.schemas_hr import BookSlotRequest, PatchBookingRequest, PublicScheduleView, InterviewSlotPublic
+from app.services.schedule_applicant_sync import on_interview_declined, on_slot_reserved, on_slot_released
 from app.services.scheduling_notifications import (
     booking_correlation_key,
     delete_unsent_by_correlation,
@@ -60,12 +61,20 @@ def public_view(token: str, db: Annotated[Session | None, Depends(get_db)]):
                 remaining=_remaining(db, s),
             )
         )
+    declined_at = getattr(cand, "schedule_declined_at", None)
+    if declined_at:
+        participation = "declined"
+    elif booked_slot_id:
+        participation = "confirmed"
+    else:
+        participation = "pending"
     return PublicScheduleView(
         round_title=rnd.title,
         candidate_name=cand.name,
         timezone=rnd.timezone,
         slots=slots_out,
         already_booked_slot_id=booked_slot_id,
+        participation=participation,
     )
 
 
@@ -94,6 +103,7 @@ def book_slot(
     rnd = load_round_for_notifications(db, cand.round_id)
     if rnd is None:
         raise HTTPException(status_code=500, detail="일정 로드 실패")
+    on_slot_reserved(db, cand=cand, rnd=rnd)
     notify_booking_confirmed(db, booking_id=booking.id, cand=cand, slot=slot, rnd=rnd)
     maybe_notify_slots_exhausted(
         db,
@@ -138,6 +148,7 @@ def change_booking(
     rnd = load_round_for_notifications(db, cand.round_id)
     if rnd is None:
         raise HTTPException(status_code=500, detail="일정 로드 실패")
+    on_slot_reserved(db, cand=cand, rnd=rnd)
     notify_booking_confirmed(db, booking_id=booking.id, cand=cand, slot=new_slot, rnd=rnd)
     maybe_notify_slots_exhausted(
         db,
@@ -165,6 +176,7 @@ def cancel_booking(token: str, db: Annotated[Session | None, Depends(get_db)]):
     delete_unsent_by_correlation(db, booking_correlation_key(booking.id))
     db.delete(booking)
     if rnd:
+        on_slot_released(db, cand=cand, rnd=rnd)
         enqueue_hr_booking_cancelled(
             db,
             user_id=rnd.user_id,
@@ -174,3 +186,35 @@ def cancel_booking(token: str, db: Annotated[Session | None, Depends(get_db)]):
         )
     db.commit()
     return {"ok": True, "cancelled": True}
+
+
+@router.post("/{token}/decline")
+def decline_interview(token: str, db: Annotated[Session | None, Depends(get_db)]):
+    """면접 참석이 어렵다고 응답합니다. 예약이 있으면 취소되며, 연결된 지원서가 있으면 단계가 불합격으로 반영됩니다."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="DATABASE_URL이 설정되지 않았습니다.")
+    cand = db.scalars(select(InterviewCandidate).where(InterviewCandidate.access_token == token)).first()
+    if not cand:
+        raise HTTPException(status_code=404, detail="링크가 유효하지 않습니다.")
+    rnd = load_round_for_notifications(db, cand.round_id)
+    if rnd is None:
+        raise HTTPException(status_code=500, detail="일정 로드 실패")
+
+    booking = db.scalars(select(InterviewBooking).where(InterviewBooking.candidate_id == cand.id)).first()
+    if getattr(cand, "schedule_declined_at", None) and not booking:
+        return {"ok": True, "declined": True, "already": True}
+
+    if booking:
+        delete_unsent_by_correlation(db, booking_correlation_key(booking.id))
+        db.delete(booking)
+        enqueue_hr_booking_cancelled(
+            db,
+            user_id=rnd.user_id,
+            hr_email=rnd.hr_notify_email,
+            round_title=rnd.title,
+            candidate_name=cand.name,
+        )
+
+    on_interview_declined(db, cand=cand, rnd=rnd)
+    db.commit()
+    return {"ok": True, "declined": True, "already": False}

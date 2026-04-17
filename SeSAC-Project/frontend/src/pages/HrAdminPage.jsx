@@ -1,274 +1,401 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, Navigate } from 'react-router-dom'
+import { useCallback, useEffect, useState } from 'react'
+import { Navigate } from 'react-router-dom'
 import { useHrAuth } from '../context/HrAuthContext'
 import {
-  hrAdminNotificationSummary,
+  hrAdminDeleteUser,
   hrAdminPatchUser,
-  hrAdminPatchUserByEmail,
-  hrAdminRecentFailures,
-  hrAdminRetryNotification,
   hrAdminUsers,
+  hrRegister,
 } from '../api/client'
 
-export function HrAdminPage() {
-  const { user, loading } = useHrAuth()
-  const [users, setUsers] = useState([])
-  const [summary, setSummary] = useState(null)
-  const [failures, setFailures] = useState([])
-  const [error, setError] = useState(null)
-  const [okMsg, setOkMsg] = useState(null)
-  const [busyId, setBusyId] = useState(null)
-  const [emailInput, setEmailInput] = useState('')
+const ROLE_CONFIG = {
+  admin: { label: 'SUPER ADMIN', bg: 'bg-violet-100 text-violet-800', dot: 'bg-violet-500' },
+  normal: { label: 'MEMBER', bg: 'bg-slate-100 text-slate-600', dot: 'bg-slate-400' },
+}
 
-  const adminCount = useMemo(() => users.filter((u) => u.is_admin).length, [users])
+const AVATAR_COLORS = [
+  'bg-violet-500', 'bg-cyan-500', 'bg-emerald-500',
+  'bg-rose-500', 'bg-amber-500', 'bg-sky-500',
+]
+
+const FILTER_TABS = [
+  { key: 'ALL', label: 'All' },
+  { key: 'ADMIN', label: 'Super Admin' },
+  { key: 'MEMBER', label: 'Member' },
+]
+
+function formatDate(iso) {
+  if (!iso) return '기록 없음'
+  try {
+    return new Date(iso).toLocaleDateString('ko-KR', { year: 'numeric', month: 'short', day: 'numeric' })
+  } catch {
+    return iso
+  }
+}
+
+export function HrAdminPage() {
+  const { user: me, loading: authLoading } = useHrAuth()
+  const [users, setUsers] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState('ALL')
+  const [busyId, setBusyId] = useState(null)
+  const [toastMsg, setToastMsg] = useState(null)
+  const [toastType, setToastType] = useState('ok')
+  const [showRegModal, setShowRegModal] = useState(false)
+  const [regForm, setRegForm] = useState({ email: '', password: '', full_name: '' })
+  const [regBusy, setRegBusy] = useState(false)
+  const [regError, setRegError] = useState(null)
+
+  const showToast = (msg, type = 'ok') => {
+    setToastMsg(msg)
+    setToastType(type)
+    setTimeout(() => setToastMsg(null), 3000)
+  }
 
   const load = useCallback(async () => {
     setError(null)
-    setOkMsg(null)
+    setLoading(true)
     try {
-      const [u, s, f] = await Promise.all([
-        hrAdminUsers(),
-        hrAdminNotificationSummary(),
-        hrAdminRecentFailures(40),
-      ])
-      setUsers(Array.isArray(u) ? u : [])
-      setSummary(s)
-      setFailures(Array.isArray(f) ? f : [])
+      const data = await hrAdminUsers()
+      setUsers(Array.isArray(data) ? data : [])
     } catch (e) {
-      setError(e?.message || '불러오기 실패 (관리자만 접근 가능)')
+      setError(e?.message || '불러오기 실패')
+    } finally {
+      setLoading(false)
     }
   }, [])
 
   useEffect(() => {
-    if (loading) return
-    if (!user?.is_admin) return
+    if (authLoading) return
+    if (!me?.is_admin) return
     void load()
-  }, [load, loading, user?.is_admin])
+  }, [authLoading, load, me?.is_admin])
 
-  if (loading) {
-    return (
-      <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900/40 dark:text-slate-300">
-        불러오는 중…
-      </p>
-    )
-  }
-  if (!user?.is_admin) {
-    return <Navigate to="/hr" replace />
-  }
+  if (authLoading) return (
+    <div className="flex h-64 items-center justify-center text-sm text-slate-400">불러오는 중…</div>
+  )
+  if (!me?.is_admin) return <Navigate to="/hr" replace />
+
+  const canManage = me?.can_manage_admin_roles !== false
+
+  const filtered = users.filter((u) => {
+    const roleKey = u.is_admin ? 'ADMIN' : 'MEMBER'
+    const matchRole = filter === 'ALL' || filter === roleKey
+    const matchSearch =
+      !search ||
+      (u.full_name || '').includes(search) ||
+      u.email.includes(search)
+    return matchRole && matchSearch
+  })
 
   const setAdmin = async (userId, isAdmin) => {
+    if (!canManage) return
     setBusyId(userId)
-    setError(null)
-    setOkMsg(null)
     try {
       await hrAdminPatchUser(userId, { is_admin: isAdmin })
-      setOkMsg(isAdmin ? '관리자 권한을 부여했습니다.' : '관리자 권한을 해제했습니다.')
+      showToast(isAdmin ? '관리자 권한을 부여했습니다.' : '관리자 권한을 해제했습니다.')
       await load()
     } catch (e) {
-      setError(e?.message || '변경 실패')
+      showToast(e?.message || '변경 실패', 'err')
     } finally {
       setBusyId(null)
     }
   }
 
-  const setAdminByEmail = async (isAdmin) => {
-    const email = emailInput.trim()
-    if (!email) {
-      setError('이메일을 입력하세요.')
-      return
-    }
-    setBusyId(`email:${email}`)
-    setError(null)
-    setOkMsg(null)
+  const deleteUser = async (userId, email) => {
+    if (!canManage) return
+    if (!window.confirm(`${email} 계정을 삭제할까요?\n\n이 작업은 되돌릴 수 없습니다.`)) return
+    setBusyId(userId)
     try {
-      await hrAdminPatchUserByEmail({ email, is_admin: isAdmin })
-      setOkMsg(isAdmin ? `"${email}" 에게 관리자 권한을 부여했습니다.` : `"${email}" 의 관리자 권한을 해제했습니다.`)
-      setEmailInput('')
+      await hrAdminDeleteUser(userId)
+      showToast(`${email} 계정을 삭제했습니다.`)
       await load()
     } catch (e) {
-      setError(e?.message || '변경 실패')
-    } finally {
-      setBusyId(null)
-    }
-  }
-
-  const retryOne = async (id) => {
-    setBusyId(id)
-    setError(null)
-    setOkMsg(null)
-    try {
-      await hrAdminRetryNotification(id)
-      setOkMsg('재시도 큐에 넣었습니다.')
-      await load()
-    } catch (e) {
-      setError(e?.message || '재시도 실패')
+      showToast(e?.message || '삭제 실패', 'err')
     } finally {
       setBusyId(null)
     }
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="space-y-6">
+      {/* Toast */}
+      {toastMsg && (
+        <div
+          className={`fixed right-6 top-6 z-50 rounded-xl px-5 py-3 text-sm font-medium text-white shadow-xl ${
+            toastType === 'err' ? 'bg-red-600' : 'bg-slate-900'
+          }`}
+        >
+          {toastType === 'err' ? '✕' : '✓'} {toastMsg}
+        </div>
+      )}
+
+      {/* Header */}
+      <div className="flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">관리자</h1>
-          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            사용자 관리자 권한 부여·해지, 알림 큐(전송 포기 재시도)
+          <span className="inline-block rounded-full border border-violet-200 bg-violet-50 px-3 py-0.5 text-[11px] font-semibold tracking-widest text-violet-600">
+            ACCESS CONTROL
+          </span>
+          <h1 className="mt-2 flex items-center gap-2 text-2xl font-bold text-slate-900">
+            <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-violet-600 text-white text-sm">
+              🛡
+            </span>
+            계정 및 권한 관리
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            사내 인사 담당자 및 면접관의 시스템 접근 권한을 안전하게 통제합니다.
           </p>
         </div>
-        <Link to="/hr" className="text-sm text-violet-600 hover:underline dark:text-violet-400">
-          ← HR 홈
-        </Link>
+        <button
+          onClick={() => { setRegForm({ email: '', password: '', full_name: '' }); setRegError(null); setShowRegModal(true) }}
+          className="flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-semibold text-white shadow hover:bg-slate-800"
+        >
+          <span>👤+</span> 계정 등록
+        </button>
       </div>
 
-      {error && (
-        <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-200">
-          {error}
-        </p>
-      )}
-      {okMsg && (
-        <p className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-100">
-          {okMsg}
-        </p>
+      {/* Restrictions notice */}
+      {!canManage && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+          이 서버는 <code className="rounded bg-amber-100 px-1 text-xs">HR_SUPER_ADMIN_EMAILS</code> 설정으로
+          최고 관리자만 권한을 변경할 수 있습니다.
+        </div>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">이메일로 권한 부여·해지</h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          가입된 사용자 이메일만 가능합니다. 마지막 한 명의 관리자는 해제할 수 없고, 본인 권한은 여기서 해제할 수 없습니다.
-        </p>
-        <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-end">
-          <label className="block min-w-0 flex-1 text-sm font-medium text-slate-700 dark:text-slate-300">
-            이메일
-            <input
-              type="email"
-              value={emailInput}
-              onChange={(e) => setEmailInput(e.target.value)}
-              placeholder="user@company.com"
-              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
+      {/* Error */}
+      {error && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+          {error}
+        </div>
+      )}
+
+      {/* Search + Filter */}
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative flex-1 min-w-52">
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 text-sm">🔍</span>
+          <input
+            type="text"
+            placeholder="이름, 이메일 검색..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-9 pr-4 text-sm text-slate-800 shadow-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+          />
+        </div>
+        <div className="flex gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+          {FILTER_TABS.map((tab) => (
             <button
-              type="button"
-              disabled={Boolean(busyId)}
-              onClick={() => void setAdminByEmail(true)}
-              className="rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+              key={tab.key}
+              onClick={() => setFilter(tab.key)}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                filter === tab.key
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'
+              }`}
             >
-              관리자 부여
+              {tab.label}
             </button>
-            <button
-              type="button"
-              disabled={Boolean(busyId)}
-              onClick={() => {
-                if (!window.confirm('이 계정의 관리자 권한을 해제할까요?')) return
-                void setAdminByEmail(false)
-              }}
-              className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-800 hover:bg-slate-50 disabled:opacity-50 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800"
-            >
-              관리자 해지
-            </button>
+          ))}
+        </div>
+        <button
+          onClick={() => void load()}
+          disabled={loading}
+          className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+        >
+          {loading ? '로딩 중…' : '새로고침'}
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        {loading ? (
+          <div className="flex h-48 items-center justify-center text-sm text-slate-400">
+            불러오는 중…
+          </div>
+        ) : (
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-slate-100 bg-slate-50/70">
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  사용자 정보
+                </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  권한
+                </th>
+                <th className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  가입일
+                </th>
+                <th className="px-6 py-3.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  관리
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-50">
+              {filtered.map((u, i) => {
+                const isSelf = me?.id === u.id
+                const roleKey = u.is_admin ? 'admin' : 'normal'
+                const role = ROLE_CONFIG[roleKey]
+                const avatarBg = AVATAR_COLORS[i % AVATAR_COLORS.length]
+                const initial = (u.full_name || u.email).charAt(0).toUpperCase()
+                const adminCount = users.filter((x) => x.is_admin).length
+                const canRevoke = canManage && u.is_admin && adminCount > 1 && !isSelf
+                const canGrant = canManage && !u.is_admin
+                const canDel = canManage && !isSelf && (!u.is_admin || adminCount > 1)
+
+                return (
+                  <tr key={u.id} className="group hover:bg-slate-50/80 transition-colors">
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${avatarBg} text-sm font-bold text-white`}
+                        >
+                          {initial}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5 font-semibold text-slate-900">
+                            {u.full_name || '(이름 없음)'}
+                            {isSelf && (
+                              <span className="rounded bg-slate-100 px-1.5 text-[10px] font-medium text-slate-500">
+                                나
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-xs text-slate-400">{u.email}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-4">
+                      <span
+                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-bold tracking-wide ${role.bg}`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${role.dot}`} />
+                        {role.label}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-slate-500">{formatDate(u.created_at)}</td>
+                    <td className="px-6 py-4">
+                      <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                        {canGrant && (
+                          <button
+                            disabled={busyId === u.id}
+                            onClick={() => void setAdmin(u.id, true)}
+                            className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:opacity-50"
+                          >
+                            관리자 부여
+                          </button>
+                        )}
+                        {canRevoke && (
+                          <button
+                            disabled={busyId === u.id}
+                            onClick={() => {
+                              if (!window.confirm(`${u.email} 관리자 권한을 해제할까요?`)) return
+                              void setAdmin(u.id, false)
+                            }}
+                            className="rounded-lg border border-amber-200 px-3 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                          >
+                            권한 해제
+                          </button>
+                        )}
+                        {canDel && (
+                          <button
+                            disabled={busyId === u.id}
+                            onClick={() => void deleteUser(u.id, u.email)}
+                            className="rounded-lg border border-red-100 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            삭제
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {filtered.length === 0 && !loading && (
+                <tr>
+                  <td colSpan={4} className="py-12 text-center text-sm text-slate-400">
+                    {error ? '데이터를 불러올 수 없습니다.' : '검색 결과가 없습니다.'}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        )}
+      </div>
+
+      {/* 계정 등록 모달 */}
+      {showRegModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+            <h2 className="text-lg font-bold text-slate-900">새 계정 등록</h2>
+            <p className="mt-1 text-sm text-slate-500">신규 HR 담당자 계정을 직접 생성합니다.</p>
+            {regError && (
+              <div className="mt-3 rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                {regError}
+              </div>
+            )}
+            <div className="mt-5 space-y-4">
+              {[
+                { key: 'full_name', label: '이름', placeholder: '홍길동', type: 'text' },
+                { key: 'email', label: '이메일', placeholder: 'user@company.com', type: 'email' },
+                { key: 'password', label: '비밀번호 (8자 이상)', placeholder: '••••••••', type: 'password' },
+              ].map(({ key, label, placeholder, type }) => (
+                <div key={key}>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-700">{label}</label>
+                  <input
+                    type={type}
+                    value={regForm[key]}
+                    onChange={(e) => setRegForm((f) => ({ ...f, [key]: e.target.value }))}
+                    placeholder={placeholder}
+                    className="w-full rounded-xl border border-slate-200 px-4 py-2.5 text-sm text-slate-900 outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 flex justify-end gap-3">
+              <button
+                onClick={() => setShowRegModal(false)}
+                className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                취소
+              </button>
+              <button
+                disabled={regBusy}
+                onClick={async () => {
+                  setRegError(null)
+                  if (!regForm.email || !regForm.password) {
+                    setRegError('이메일과 비밀번호를 입력하세요.')
+                    return
+                  }
+                  setRegBusy(true)
+                  try {
+                    await hrRegister(regForm.email, regForm.password, regForm.full_name)
+                    showToast(`${regForm.email} 계정 등록 완료`)
+                    setShowRegModal(false)
+                    await load()
+                  } catch (e) {
+                    setRegError(e?.message || '등록 실패')
+                  } finally {
+                    setRegBusy(false)
+                  }
+                }}
+                className="rounded-xl bg-slate-900 px-5 py-2 text-sm font-semibold text-white hover:bg-slate-800 disabled:opacity-50"
+              >
+                {regBusy ? '등록 중…' : '등록'}
+              </button>
+            </div>
           </div>
         </div>
-      </section>
-
-      {summary && (
-        <section className="rounded-2xl border border-slate-200 bg-white p-5 text-sm dark:border-slate-800 dark:bg-slate-900/40">
-          <h2 className="text-lg font-semibold text-slate-900 dark:text-white">알림 요약</h2>
-          <ul className="mt-3 grid gap-2 sm:grid-cols-2">
-            <li>발송 대기(지금 처리 가능): {summary.pending_due}</li>
-            <li>예약됨(미래): {summary.pending_scheduled_future}</li>
-            <li>전송 포기(dead): {summary.dead_letter}</li>
-            <li>발송완료·스킵: {summary.sent_or_skipped}</li>
-          </ul>
-          <p className="mt-3 text-xs text-slate-500">
-            실패 시 지수 백오프로 재시도하며, 상한 초과 시 전송 포기 처리됩니다. 환경변수:{' '}
-            <code className="rounded bg-slate-100 px-1 dark:bg-slate-800">NOTIFICATION_MAX_SEND_ATTEMPTS</code> 등
-          </p>
-        </section>
       )}
 
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">사용자 목록</h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">관리자 {adminCount}명</p>
-        <ul className="mt-3 space-y-2 text-sm">
-          {users.map((u) => {
-            const isSelf = user?.id === u.id
-            const canRevoke = u.is_admin && adminCount > 1 && !isSelf
-            const canGrant = !u.is_admin
-            return (
-              <li
-                key={u.id}
-                className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-100 px-3 py-3 dark:border-slate-800"
-              >
-                <div>
-                  <span className="font-medium text-slate-900 dark:text-white">{u.email}</span>
-                  <span className="ml-2 text-slate-500">{u.full_name}</span>
-                  {u.is_admin && (
-                    <span className="ml-2 rounded bg-violet-100 px-1.5 text-xs text-violet-900 dark:bg-violet-900/40 dark:text-violet-100">
-                      관리자
-                    </span>
-                  )}
-                  {isSelf && <span className="ml-2 text-xs text-slate-500">(본인)</span>}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    type="button"
-                    disabled={!canGrant || busyId === u.id}
-                    onClick={() => void setAdmin(u.id, true)}
-                    className="rounded-lg bg-violet-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40"
-                  >
-                    부여
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!canRevoke || busyId === u.id}
-                    title={
-                      isSelf
-                        ? '본인 권한은 API로 해제할 수 없습니다'
-                        : !u.is_admin
-                          ? '관리자가 아닙니다'
-                          : adminCount <= 1
-                            ? '마지막 관리자는 해제할 수 없습니다'
-                            : undefined
-                    }
-                    onClick={() => {
-                      if (!window.confirm(`${u.email} 관리자 권한을 해제할까요?`)) return
-                      void setAdmin(u.id, false)
-                    }}
-                    className="rounded-lg border border-red-200 px-3 py-1.5 text-xs text-red-800 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-red-900/50 dark:text-red-200 dark:hover:bg-red-950/30"
-                  >
-                    해지
-                  </button>
-                </div>
-              </li>
-            )
-          })}
-        </ul>
-      </section>
-
-      <section className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-slate-800 dark:bg-slate-900/40">
-        <h2 className="text-lg font-semibold text-slate-900 dark:text-white">최근 전송 포기 알림</h2>
-        <ul className="mt-3 space-y-2 text-xs">
-          {failures.map((f) => (
-            <li key={f.id} className="rounded border border-slate-100 p-2 dark:border-slate-800">
-              <div className="font-mono text-slate-600 dark:text-slate-400">{f.id}</div>
-              <div>
-                {f.channel} → {f.recipient} · {f.kind} · 시도 {f.attempt_count}
-              </div>
-              <div className="mt-1 text-red-700 dark:text-red-300">{f.last_error}</div>
-              <button
-                type="button"
-                disabled={busyId === f.id}
-                onClick={() => void retryOne(f.id)}
-                className="mt-2 rounded bg-violet-600 px-2 py-1 text-xs text-white hover:bg-violet-700 disabled:opacity-50"
-              >
-                다시 큐에 넣기
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {/* Stats footer */}
+      {!loading && users.length > 0 && (
+        <div className="flex gap-4 text-xs text-slate-400">
+          <span>전체 {users.length}명</span>
+          <span>관리자 {users.filter((u) => u.is_admin).length}명</span>
+          <span>일반 {users.filter((u) => !u.is_admin).length}명</span>
+        </div>
+      )}
     </div>
   )
 }

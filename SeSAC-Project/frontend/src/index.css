@@ -6,6 +6,18 @@
   --font-sans: ui-sans-serif, system-ui, sans-serif;
 }
 
+:root {
+  --app-bg: #f7f8fc;
+  --app-surface: #ffffff;
+  --app-border: #e5e7eb;
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-primary: #4f46e5;
+  --app-primary-strong: #4338ca;
+  --app-radius-lg: 16px;
+  --app-radius-xl: 22px;
+}
+
 html {
   color-scheme: light;
 }
@@ -18,8 +30,55 @@ body {
   margin: 0;
   min-height: 100dvh;
   @apply bg-slate-50 text-slate-900 antialiased dark:bg-slate-950 dark:text-slate-100;
+  background: radial-gradient(1200px 800px at 15% -10%, #eef2ff 0%, transparent 55%), var(--app-bg);
 }
 
 #root {
   min-height: 100dvh;
+}
+
+.hr-card {
+  @apply rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900/60;
+}
+
+.hr-panel {
+  @apply rounded-[22px] border border-slate-200/90 bg-white/95 shadow-sm backdrop-blur-sm dark:border-slate-800 dark:bg-slate-900/70;
+}
+
+.hr-btn-primary {
+  @apply inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-indigo-700 disabled:opacity-50;
+}
+
+.hr-btn-ghost {
+  @apply inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:opacity-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
+}
+
+/* Ensure dark mode is visually consistent across HR pages even when some components
+   still use light-only utility classes. Scoped to HR layout only. */
+html.dark .hr-theme-scope .bg-white {
+  background-color: rgb(15 23 42) !important;
+}
+
+html.dark .hr-theme-scope .bg-slate-50,
+html.dark .hr-theme-scope .bg-slate-100,
+html.dark .hr-theme-scope .bg-slate-50\/80,
+html.dark .hr-theme-scope .bg-slate-100\/90 {
+  background-color: rgb(30 41 59) !important;
+}
+
+html.dark .hr-theme-scope .text-slate-900,
+html.dark .hr-theme-scope .text-slate-800 {
+  color: rgb(241 245 249) !important;
+}
+
+html.dark .hr-theme-scope .text-slate-700,
+html.dark .hr-theme-scope .text-slate-600 {
+  color: rgb(203 213 225) !important;
+}
+
+html.dark .hr-theme-scope .border-slate-200,
+html.dark .hr-theme-scope .border-slate-300,
+html.dark .hr-theme-scope .border-slate-200\/80,
+html.dark .hr-theme-scope .border-slate-200\/90 {
+  border-color: rgb(51 65 85) !important;
 }

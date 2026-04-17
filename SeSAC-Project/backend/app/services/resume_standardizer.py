@@ -7,6 +7,7 @@ from typing import Any
 from openai import OpenAI
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 SYSTEM = """당신은 채용팀의 이력서 표준화 엔진입니다.
 목표: 어떤 자유 양식 이력서든 사전에 정한 스키마 JSON으로만 변환합니다.
@@ -152,6 +153,12 @@ def standardize_resume_text(*, resume_text: str, settings: Settings) -> dict[str
             {"role": "user", "content": resume_text[:120_000]},
         ],
         response_format={"type": "json_schema", "json_schema": SCHEMA},
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=settings.openai_model,
+        feature="resume_standardizer",
+        request_kind="chat",
     )
     raw = completion.choices[0].message.content
     if not raw:

@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
-import { hrDeleteAccount, hrLogin, hrLogout, hrMe, hrRegister } from '../api/client'
+import { hrLogin, hrLogout, hrMe, hrRegister } from '../api/client'
 import { clearHrToken, getHrToken, setHrToken } from '../utils/hrTokenStorage'
 
 const HrAuthContext = createContext(null)
@@ -57,14 +57,6 @@ export function HrAuthProvider({ children }) {
     setUser(null)
   }, [])
 
-  const deleteAccount = useCallback(async (password) => {
-    await hrDeleteAccount(password)
-    hrLogout()
-    clearHrToken()
-    setToken('')
-    setUser(null)
-  }, [])
-
   const value = useMemo(
     () => ({
       token,
@@ -73,10 +65,9 @@ export function HrAuthProvider({ children }) {
       login,
       register,
       logout,
-      deleteAccount,
       refreshMe,
     }),
-    [token, user, loading, login, register, logout, deleteAccount, refreshMe],
+    [token, user, loading, login, register, logout, refreshMe],
   )
 
   return <HrAuthContext.Provider value={value}>{children}</HrAuthContext.Provider>

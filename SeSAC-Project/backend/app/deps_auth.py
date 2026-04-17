@@ -42,6 +42,24 @@ def require_admin(user: Annotated[User, Depends(get_current_user)]) -> User:
     return user
 
 
+def require_can_manage_admin_roles(
+    user: Annotated[User, Depends(require_admin)],
+) -> User:
+    """다른 계정의 관리자 플래그 변경. HR_SUPER_ADMIN_EMAILS 설정 시 목록 내 계정만 허용."""
+    from app.services.hr_admin_access import can_manage_admin_roles
+
+    settings = get_settings()
+    if not can_manage_admin_roles(settings, user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=(
+                "관리자 권한 부여·해제는 최고 관리자만 할 수 있습니다. "
+                "서버에 HR_SUPER_ADMIN_EMAILS(쉼표 구분)로 허용 이메일을 설정하세요."
+            ),
+        )
+    return user
+
+
 def get_user_by_id(db: Session, user_id: UUID) -> User | None:
     return db.get(User, user_id)
 

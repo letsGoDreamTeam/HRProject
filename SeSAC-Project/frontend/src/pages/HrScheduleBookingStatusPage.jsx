@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import { hrGetScheduleBookingStatus, hrRemindPendingCandidates } from '../api/client'
 
@@ -20,6 +20,7 @@ export function HrScheduleBookingStatusPage() {
   const [error, setError] = useState(null)
   const [busy, setBusy] = useState(false)
   const [remindMsg, setRemindMsg] = useState(null)
+  const pollRef = useRef(null)
 
   const load = useCallback(async () => {
     if (!roundId) return
@@ -37,6 +38,20 @@ export function HrScheduleBookingStatusPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  /** 면접자 링크 응답이 HR 화면에 곧바로 보이도록 주기적으로 새로고침합니다. */
+  useEffect(() => {
+    if (!roundId) return undefined
+    const tick = () => {
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return
+      void load()
+    }
+    pollRef.current = window.setInterval(tick, 5000)
+    return () => {
+      if (pollRef.current != null) window.clearInterval(pollRef.current)
+      pollRef.current = null
+    }
+  }, [roundId, load])
 
   const copy = async (text) => {
     try {
@@ -73,8 +88,8 @@ export function HrScheduleBookingStatusPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900 dark:text-white">면접 응답·예약 현황</h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            지원자별 확정 여부와 슬롯별 잔여 정원을 한눈에 보고, 아직 시간을 고르지 않은 분에게 링크 재안내를 큐에 넣을 수
-            있습니다.
+            지원자별 확정·불참·미선택과 슬롯별 잔여 정원을 한눈에 보고, 아직 시간을 고르지 않은 분에게 링크 재안내를 큐에 넣을
+            수 있습니다. 이 페이지는 약 5초마다 자동으로 최신 응답을 불러옵니다.
           </p>
         </div>
         <div className="flex flex-wrap gap-3 text-sm">
@@ -97,6 +112,9 @@ export function HrScheduleBookingStatusPage() {
           {remindMsg}
         </p>
       )}
+      {roundId && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">백그라운드 탭에서는 자동 새로고침이 잠시 멈춥니다.</p>
+      )}
 
       {!data && !error && <p className="text-sm text-slate-500">불러오는 중…</p>}
 
@@ -106,6 +124,7 @@ export function HrScheduleBookingStatusPage() {
             <h2 className="text-lg font-semibold text-slate-900 dark:text-white">{data.title}</h2>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
               타임존 {data.timezone} · 확정 {data.confirmed_count}명 · 미선택 {data.pending_count}명
+              {typeof data.declined_count === 'number' ? ` · 불참 응답 ${data.declined_count}명` : ''}
             </p>
             <button
               type="button"
@@ -141,6 +160,10 @@ export function HrScheduleBookingStatusPage() {
                         {c.status === 'confirmed' ? (
                           <span className="rounded bg-emerald-100 px-2 py-0.5 text-emerald-900 dark:bg-emerald-900/40 dark:text-emerald-100">
                             확정
+                          </span>
+                        ) : c.status === 'declined' ? (
+                          <span className="rounded bg-slate-200 px-2 py-0.5 text-slate-800 dark:bg-slate-700 dark:text-slate-100">
+                            불참
                           </span>
                         ) : (
                           <span className="rounded bg-amber-100 px-2 py-0.5 text-amber-900 dark:bg-amber-900/40 dark:text-amber-100">

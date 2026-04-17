@@ -7,6 +7,7 @@ from docx import Document
 from striprtf.striprtf import rtf_to_text
 
 from app.config import Settings
+from app.services.office_pdf_convert import convert_office_bytes_to_pdf
 from app.services.pdf_text import extract_text_from_pdf_bytes
 
 
@@ -36,6 +37,18 @@ def extract_resume_text_from_file(
     if is_pdf:
         text, _ocr = extract_text_from_pdf_bytes(raw, settings)
         return text, "native_pdf", "pdf 추출 완료"
+    if ext in (".hwp", ".hwpx"):
+        try:
+            pdf_bytes, conv_note = convert_office_bytes_to_pdf(
+                raw=raw, filename=filename or "document.hwp", settings=settings
+            )
+            text, _ocr = extract_text_from_pdf_bytes(pdf_bytes, settings)
+            return text, "native_pdf", f"hwp/hwpx → PDF 후 추출 ({conv_note})"
+        except Exception as e:  # noqa: BLE001
+            raise ValueError(
+                "HWP/HWPX는 `RESUME_OFFICE_TO_PDF_HTTP_URL` 등 PDF 변환 경로가 필요합니다. "
+                f"또는 한글에서 PDF로 저장 후 업로드하세요. ({e!s})"
+            ) from e
     if ext == ".docx":
         doc = Document(BytesIO(raw))
         text = "\n".join(p.text for p in doc.paragraphs)
@@ -44,4 +57,7 @@ def extract_resume_text_from_file(
         return _decode_text(raw), "extracted_direct", f"{ext.replace('.', '')} 직접 추출 완료"
     if ext == ".rtf":
         return rtf_to_text(_decode_text(raw)), "extracted_direct", "rtf 직접 추출 완료"
-    raise ValueError(f"지원하지 않는 형식입니다: {ext or '(확장자 없음)'} (pdf/docx/txt/md/rtf 지원)")
+    raise ValueError(
+        f"지원하지 않는 형식입니다: {ext or '(확장자 없음)'} "
+        "(pdf/docx/txt/md/rtf 및 HWP/HWPX는 PDF 변환 API 연결 시 지원)"
+    )

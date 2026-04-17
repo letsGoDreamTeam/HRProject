@@ -1,4 +1,4 @@
-"""직무 프로필 다건 RAG: 로컬 JSON + OpenAI 임베딩 (apass_vector와 동일 패턴)."""
+"""직무 프로필 다건 RAG: 로컬 JSON + OpenAI 임베딩."""
 
 from __future__ import annotations
 
@@ -14,11 +14,11 @@ from sqlalchemy.orm import Session
 
 from app.config import Settings
 from app.models_hr import JobRoleProfile
-from app.services.apass_vector import _chunks, _data_root, _embed_batch
+from app.services.embedding_store import chunk_text, data_root, embed_batch
 
 
 def _collection_path(settings: Settings, user_id: uuid.UUID) -> Path:
-    return _data_root(settings) / "collections" / f"hr_jobs_{user_id!s}.json"
+    return data_root(settings) / "collections" / f"hr_jobs_{user_id!s}.json"
 
 
 def remove_user_job_roles_rag_file(settings: Settings, user_id: uuid.UUID) -> None:
@@ -43,7 +43,7 @@ def reindex_user_job_roles(settings: Settings, db: Session, user_id: uuid.UUID) 
         if row.role_grade:
             header += f" | {row.role_grade}"
         full = f"## {header}\n{row.body_text or ''}".strip()
-        for piece in _chunks(full, max_chars=1100):
+        for piece in chunk_text(full, max_chars=1100):
             if not piece.strip():
                 continue
             chunk_records.append(
@@ -69,11 +69,11 @@ def reindex_user_job_roles(settings: Settings, db: Session, user_id: uuid.UUID) 
     all_vecs: list[list[float]] = []
     for i in range(0, len(texts), batch_size):
         batch = texts[i : i + batch_size]
-        all_vecs.extend(_embed_batch(client, settings.apass_embedding_model, batch))
+        all_vecs.extend(embed_batch(client, settings.embedding_model, batch))
 
     payload = {
         "user_id": str(user_id),
-        "embedding_model": settings.apass_embedding_model,
+        "embedding_model": settings.embedding_model,
         "chunks": [
             {**chunk_records[i], "embedding": all_vecs[i]} for i in range(len(chunk_records))
         ],
@@ -105,7 +105,7 @@ def search_user_job_roles(
     matrix_list = [c["embedding"] for c in chunks]
     matrix = np.array(matrix_list, dtype=np.float64)
     client = OpenAI(api_key=settings.openai_api_key)
-    qv = np.array(_embed_batch(client, settings.apass_embedding_model, [query.strip()])[0], dtype=np.float64)
+    qv = np.array(embed_batch(client, settings.embedding_model, [query.strip()])[0], dtype=np.float64)
 
     qn = np.linalg.norm(qv) + 1e-12
     mn = np.linalg.norm(matrix, axis=1) + 1e-12

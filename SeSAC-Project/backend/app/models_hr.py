@@ -6,7 +6,7 @@ import secrets
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint, func
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSON, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -59,6 +59,7 @@ class JobRoleProfile(Base):
     department: Mapped[str] = mapped_column(String(400), nullable=False, default="")
     job_title: Mapped[str] = mapped_column(String(400), nullable=False, default="")
     role_grade: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    headcount_to: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     body_text: Mapped[str] = mapped_column(Text, nullable=False, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
@@ -73,10 +74,32 @@ class ApplicationFilterBatch(Base):
     user_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    job_role_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("job_role_profiles.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     title: Mapped[str] = mapped_column(String(400), nullable=False, default="지원서 분류")
     jd_preferred_text: Mapped[str] = mapped_column(
         Text, nullable=False, default="", comment="공고 내 우대·자격 요건 등"
     )
+    # public: 공기업·공공기관 등 블라인드 자소서 필터 적용 / private: 일반 사기업(해당 필터 비적용)
+    employer_sector: Mapped[str] = mapped_column(String(16), nullable=False, default="public")
+    preferred_include_patterns: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", comment="우대 충족 가산 패턴(줄바꿈 구분)"
+    )
+    preferred_exclude_patterns: Mapped[str] = mapped_column(
+        Text, nullable=False, default="", comment="우대 충족 제외 패턴(줄바꿈 구분)"
+    )
+    preferred_requires_evidence: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=True, comment="행동동사+결과 증거 필수 여부"
+    )
+    department_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    position_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    posting_platform: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    deadline_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     items: Mapped[list["ApplicationFilterItem"]] = relationship(
@@ -110,8 +133,8 @@ class ApplicationFilterItem(Base):
     birth_date: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     email_extracted: Mapped[str] = mapped_column(String(320), nullable=False, default="")
     stage: Mapped[str] = mapped_column(
-        String(32), nullable=False, default="document_review"
-    )  # document_review | interview_n | final_pass | final_fail
+        String(32), nullable=False, default="document_screening"
+    )  # document_screening | interview_1 | interview_2 | final | hired | rejected (+레거시 호환)
     duplicate_key: Mapped[str] = mapped_column(String(300), nullable=False, default="", index=True)
     source_ext: Mapped[str] = mapped_column(String(16), nullable=False, default="pdf")
     pdf_conversion_status: Mapped[str] = mapped_column(
@@ -121,9 +144,86 @@ class ApplicationFilterItem(Base):
     text_quality_ok: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     text_quality_note: Mapped[str] = mapped_column(Text, nullable=False, default="")
     analyzed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    schedule_confirmed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="후보자가 일정 확인 링크에서 '확인' 클릭한 시각"
+    )
+    source_platform: Mapped[str] = mapped_column(String(40), nullable=False, default="unknown")
+    role_relevance_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    resume_completeness_score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    missing_fields: Mapped[list | dict] = mapped_column(JSON, nullable=False, default=list)
+    preferred_rule_hits: Mapped[list | dict] = mapped_column(JSON, nullable=False, default=list)
+    preferred_rule_excluded_hits: Mapped[list | dict] = mapped_column(JSON, nullable=False, default=list)
+    evidence_level: Mapped[str] = mapped_column(String(16), nullable=False, default="unknown")
+    # docx/rtf/txt/md 등 원본(합격 증빙·PDF 재변환용). PDF 업로드는 용량 절약을 위해 비움.
+    source_blob: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
     batch: Mapped["ApplicationFilterBatch"] = relationship(back_populates="items")
 
+
+class CandidateMaster(Base):
+    """후보자 마스터: 여러 플랫폼/지원서를 동일 인물 단위로 묶는 루트 엔티티."""
+
+    __tablename__ = "candidate_masters"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    canonical_name: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    canonical_birth_date: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    canonical_email: Mapped[str] = mapped_column(String(320), nullable=False, default="")
+    canonical_phone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+    links: Mapped[list["CandidateApplicationLink"]] = relationship(
+        back_populates="candidate", cascade="all, delete-orphan"
+    )
+
+
+class CandidateApplicationLink(Base):
+    """후보자 마스터와 실제 지원서 아이템 간 연결."""
+
+    __tablename__ = "candidate_application_links"
+    __table_args__ = (UniqueConstraint("item_id", name="uq_candidate_application_links_item_id"),)
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    candidate_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidate_masters.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("application_filter_items.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    source_platform: Mapped[str] = mapped_column(String(40), nullable=False, default="unknown")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    candidate: Mapped["CandidateMaster"] = relationship(back_populates="links")
+    item: Mapped["ApplicationFilterItem"] = relationship(foreign_keys=[item_id])
+
+
+class CandidateDedupReviewLog(Base):
+    """중복 판정/병합/분리 히스토리."""
+
+    __tablename__ = "candidate_dedup_review_logs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    action: Mapped[str] = mapped_column(String(32), nullable=False, default="review")
+    status: Mapped[str] = mapped_column(String(24), nullable=False, default="REVIEW_REQUIRED")
+    score: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
+    reason: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    item_ids: Mapped[list | dict] = mapped_column(JSON, nullable=False, default=list)
+    candidate_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("candidate_masters.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)
 
 class InterviewRound(Base):
     __tablename__ = "interview_rounds"
@@ -133,10 +233,15 @@ class InterviewRound(Base):
         UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     title: Mapped[str] = mapped_column(String(400), nullable=False, default="면접 일정")
+    department: Mapped[str] = mapped_column(String(400), nullable=False, default="")
+    job_title: Mapped[str] = mapped_column(String(400), nullable=False, default="")
+    stage_key: Mapped[str] = mapped_column(String(32), nullable=False, default="")
     timezone: Mapped[str] = mapped_column(String(64), nullable=False, default="Asia/Seoul")
     hr_notify_email: Mapped[str] = mapped_column(String(320), nullable=False, default="")
     # 한 슬롯당 지원자: single=1명만(1:1), multiple=같은 시간에 여러 명(다자·그룹 등)
     interviewee_per_slot: Mapped[str] = mapped_column(String(16), nullable=False, default="single")
+    # 1차: 원본 이력서 중심 / 2차: 회사 표준 양식 운영 등 안내용(이미지 요구 워크플로)
+    interview_phase: Mapped[str] = mapped_column(String(32), nullable=False, default="general")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     slots: Mapped[list["InterviewSlot"]] = relationship(
@@ -186,7 +291,17 @@ class InterviewCandidate(Base):
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     email: Mapped[str] = mapped_column(String(320), nullable=False, default="")
     phone: Mapped[str] = mapped_column(String(64), nullable=False, default="")
+    applied_position: Mapped[str] = mapped_column(String(400), nullable=False, default="")
     access_token: Mapped[str] = mapped_column(String(64), nullable=False, default=_token, unique=True, index=True)
+    application_filter_item_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("application_filter_items.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    schedule_declined_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="공개 링크에서 면접 불참 응답한 시각"
+    )
 
     round: Mapped["InterviewRound"] = relationship(back_populates="candidates")
     booking: Mapped["InterviewBooking | None"] = relationship(
@@ -247,6 +362,9 @@ class InterviewEvaluationSubmission(Base):
     access_token: Mapped[str] = mapped_column(String(64), nullable=False, default=_token, unique=True, index=True)
     criteria_labels: Mapped[list | dict] = mapped_column(JSON, nullable=False, default=list)
     scores: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    criteria_comments: Mapped[dict | list] = mapped_column(JSON, nullable=False, default=dict)
+    final_summary_line: Mapped[str] = mapped_column(String(500), nullable=False, default="")
+    recommendation: Mapped[str] = mapped_column(String(16), nullable=False, default="")
     overall_comment: Mapped[str] = mapped_column(Text, nullable=False, default="")
     submitted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
@@ -276,6 +394,58 @@ class InterviewBooking(Base):
     candidate: Mapped["InterviewCandidate"] = relationship(back_populates="booking")
 
 
+class StageConfirmToken(Base):
+    """지원자에게 발송하는 일정 확인 링크 토큰."""
+
+    __tablename__ = "stage_confirm_tokens"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    item_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("application_filter_items.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token: Mapped[str] = mapped_column(String(64), unique=True, nullable=False, default=_token)
+    stage_label: Mapped[str] = mapped_column(String(80), nullable=False, default="")
+    next_stage_key: Mapped[str] = mapped_column(String(32), nullable=False, default="")
+    schedule_pick_url: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    location: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    note: Mapped[str] = mapped_column(Text, nullable=False, default="")
+    confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    attendance: Mapped[str | None] = mapped_column(
+        String(16), nullable=True, comment="후보자 답변: accepted | declined | None(미응답)"
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    item: Mapped["ApplicationFilterItem"] = relationship(foreign_keys=[item_id])
+
+
+class RecruitmentProcessConfig(Base):
+    """부서/직무별 채용 절차 단계 설정. interview_1~interview_10 등 유동적인 면접 라운드 지원."""
+
+    __tablename__ = "recruitment_process_configs"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    department: Mapped[str] = mapped_column(String(400), nullable=False, default="")
+    stages: Mapped[list] = mapped_column(
+        JSON, nullable=False, default=list,
+        comment='[{"key":"document_screening","label":"서류 접수"}, ...]'
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class NotificationOutbox(Base):
     __tablename__ = "notification_outbox"
 
@@ -293,3 +463,21 @@ class NotificationOutbox(Base):
     last_error: Mapped[str] = mapped_column(Text, nullable=False, default="")
     correlation_key: Mapped[str | None] = mapped_column(String(128), nullable=True, index=True)
     attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+
+
+class OpenAITokenUsage(Base):
+    """OpenAI 모델별 토큰 사용량 로그(시스템 대시보드 집계용)."""
+
+    __tablename__ = "openai_token_usage"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    feature: Mapped[str] = mapped_column(String(80), nullable=False, default="unknown")
+    model: Mapped[str] = mapped_column(String(120), nullable=False, default="")
+    request_kind: Mapped[str] = mapped_column(String(24), nullable=False, default="chat")
+    prompt_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    completion_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), index=True)

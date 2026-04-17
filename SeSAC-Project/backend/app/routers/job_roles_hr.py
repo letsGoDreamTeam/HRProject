@@ -13,6 +13,7 @@ from app.deps_auth import get_current_user
 from app.models_hr import JobRoleProfile, User
 from app.schemas_hr import (
     JobRoleBulkUpsert,
+    JobRoleHeadcountPatch,
     JobRoleParsed,
     JobRoleProfileOut,
     JobRoleRagHit,
@@ -41,6 +42,7 @@ def _row_to_out(row: JobRoleProfile) -> JobRoleProfileOut:
         department=row.department or "",
         job_title=row.job_title or "",
         role_grade=row.role_grade or "",
+        headcount_to=int(getattr(row, "headcount_to", 0) or 0),
         body_text=row.body_text or "",
         created_at=row.created_at,
         updated_at=row.updated_at,
@@ -138,6 +140,7 @@ def bulk_replace_job_roles(
                 department=(j.department or "").strip()[:400],
                 job_title=(j.job_title or "").strip()[:400],
                 role_grade=(j.role_grade or "").strip()[:200],
+                headcount_to=int(j.headcount_to or 0),
                 body_text=(j.body_text or "").strip(),
             )
         )
@@ -155,6 +158,25 @@ def bulk_replace_job_roles(
         .order_by(JobRoleProfile.department, JobRoleProfile.job_title)
     ).all()
     return [_row_to_out(r) for r in rows]
+
+
+@router.patch("/{job_id}/headcount", response_model=JobRoleProfileOut)
+def patch_job_role_headcount(
+    job_id: UUID,
+    body: JobRoleHeadcountPatch,
+    user: Annotated[User, Depends(get_current_user)],
+    db: Annotated[Session | None, Depends(get_db)],
+):
+    """직무별 TO(정원)만 수정."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="DATABASE_URL이 설정되지 않았습니다.")
+    row = db.get(JobRoleProfile, job_id)
+    if not row or row.user_id != user.id:
+        raise HTTPException(status_code=404, detail="직무를 찾을 수 없습니다.")
+    row.headcount_to = int(body.headcount_to)
+    db.commit()
+    db.refresh(row)
+    return _row_to_out(row)
 
 
 @router.delete("/{job_id}")

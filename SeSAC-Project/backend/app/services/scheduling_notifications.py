@@ -366,7 +366,7 @@ def enqueue_interviewer_evaluation_reminder(
     url = public_evaluation_url(settings, submission.access_token)
     body = (
         f"[{round_title}] {inv.name}님, 지원자 {candidate_name} 면접 평가표를 아직 제출하지 않으셨습니다.\n"
-        f"아래 링크에서 1~5점과 코멘트를 입력해 제출해 주세요.\n{url}\n"
+        f"아래 링크에서 항목별 코멘트(서술)·1~5점, 종합 한 줄 요약, 합격/보류/불합격을 입력해 제출해 주세요.\n{url}\n"
     )
     n_e = 0
     n_s = 0

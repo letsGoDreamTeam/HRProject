@@ -10,6 +10,7 @@ from app.config import get_settings
 from app.database import get_db
 from app.deps_auth import get_current_user
 from app.models_hr import (
+    ApplicationFilterItem,
     InterviewBooking,
     InterviewCandidate,
     InterviewEvaluationSubmission,
@@ -43,6 +44,17 @@ from app.services.scheduling_notifications import (
 router = APIRouter(prefix="/api/hr/schedules", tags=["hr-schedules"])
 
 
+def _validated_application_item_id(db: Session, user_id: UUID, item_id: UUID | None) -> UUID | None:
+    if item_id is None:
+        return None
+    item = db.get(ApplicationFilterItem, item_id)
+    if item is None:
+        raise HTTPException(status_code=400, detail="연결한 지원서 항목을 찾을 수 없습니다.")
+    if item.batch.user_id != user_id:
+        raise HTTPException(status_code=400, detail="지원서 항목이 이 계정에 속하지 않습니다.")
+    return item_id
+
+
 def _slot_remaining(db: Session, slot_id: UUID, capacity: int) -> int:
     used = db.scalar(select(func.count()).select_from(InterviewBooking).where(InterviewBooking.slot_id == slot_id)) or 0
     return max(0, int(capacity) - int(used))
@@ -72,6 +84,11 @@ def _normalize_interviewee_per_slot(value: str) -> str:
     return v if v in ("single", "multiple") else "single"
 
 
+def _normalize_interview_phase(value: str) -> str:
+    v = (value or "general").lower().strip()
+    return v if v in ("general", "first_interview", "second_interview") else "general"
+
+
 def _effective_slot_capacity(per_slot: str, requested: int) -> int:
     if _normalize_interviewee_per_slot(per_slot) == "single":
         return 1
@@ -87,9 +104,13 @@ def _interview_round_public_dict(db: Session, r: InterviewRound) -> dict[str, An
     return {
         "id": str(r.id),
         "title": r.title,
+        "department": getattr(r, "department", "") or "",
+        "job_title": getattr(r, "job_title", "") or "",
+        "stage_key": getattr(r, "stage_key", "") or "",
         "timezone": r.timezone,
         "hr_notify_email": r.hr_notify_email,
         "interviewee_per_slot": per,
+        "interview_phase": str(getattr(r, "interview_phase", None) or "general"),
         "slot_total_capacity": total_cap,
         "candidate_count": cand_n,
         "created_at": r.created_at.isoformat() if r.created_at else None,
@@ -110,7 +131,15 @@ def _interview_round_public_dict(db: Session, r: InterviewRound) -> dict[str, An
                 "name": c.name,
                 "email": c.email,
                 "phone": c.phone,
+                "applied_position": getattr(c, "applied_position", "") or "",
+                "application_filter_item_id": str(c.application_filter_item_id)
+                if getattr(c, "application_filter_item_id", None)
+                else None,
                 "pick_url_path": f"/schedule/pick/{c.access_token}",
+                "booked_slot_id": str(c.booking.slot_id)
+                if getattr(c, "booking", None) is not None
+                else None,
+                "declined": getattr(c, "schedule_declined_at", None) is not None,
             }
             for c in r.candidates
         ],
@@ -140,9 +169,13 @@ def create_schedule(
     rnd = InterviewRound(
         user_id=user.id,
         title=body.title.strip() or "면접 일정",
+        department=(body.department or "").strip()[:400],
+        job_title=(body.job_title or "").strip()[:400],
+        stage_key=(body.stage_key or "").strip()[:32],
         timezone=body.timezone.strip() or "Asia/Seoul",
         hr_notify_email=(body.hr_notify_email or "").strip(),
         interviewee_per_slot=per,
+        interview_phase=_normalize_interview_phase(str(body.interview_phase)),
     )
     db.add(rnd)
     db.flush()
@@ -158,12 +191,15 @@ def create_schedule(
             )
         )
     for c in body.candidates:
+        aid = _validated_application_item_id(db, user.id, c.application_filter_item_id)
         db.add(
             InterviewCandidate(
                 round_id=rnd.id,
                 name=c.name.strip(),
                 email=(c.email or "").strip(),
                 phone=(c.phone or "").strip(),
+                applied_position=(c.applied_position or "").strip()[:400],
+                application_filter_item_id=aid,
             )
         )
     for inv in body.interviewers:
@@ -189,7 +225,7 @@ def list_schedules(user: Annotated[User, Depends(get_current_user)], db: Annotat
         .where(InterviewRound.user_id == user.id)
         .options(
             selectinload(InterviewRound.slots),
-            selectinload(InterviewRound.candidates),
+            selectinload(InterviewRound.candidates).joinedload(InterviewCandidate.booking),
             selectinload(InterviewRound.interviewers),
         )
         .order_by(InterviewRound.created_at.desc())
@@ -250,7 +286,23 @@ def booking_status(
         slot = b.slot if b else None
         path = f"/schedule/pick/{cand.access_token}"
         abs_url = public_schedule_pick_url(settings, cand.access_token)
-        if slot:
+        declined_at = getattr(cand, "schedule_declined_at", None)
+        if declined_at:
+            rows_c.append(
+                CandidateBookingRowOut(
+                    id=cand.id,
+                    name=cand.name,
+                    email=cand.email or "",
+                    phone=cand.phone or "",
+                    status="declined",
+                    slot_id=None,
+                    slot_start_at=None,
+                    slot_end_at=None,
+                    pick_url_path=path,
+                    pick_url_absolute=abs_url,
+                )
+            )
+        elif slot:
             rows_c.append(
                 CandidateBookingRowOut(
                     id=cand.id,
@@ -282,13 +334,15 @@ def booking_status(
             )
 
     conf = sum(1 for x in rows_c if x.status == "confirmed")
-    pend = len(rows_c) - conf
+    decl = sum(1 for x in rows_c if x.status == "declined")
+    pend = len(rows_c) - conf - decl
     return RoundBookingStatusOut(
         round_id=r.id,
         title=r.title,
         timezone=r.timezone,
         confirmed_count=conf,
         pending_count=pend,
+        declined_count=decl,
         candidates=rows_c,
         slots=slots_out,
     )
@@ -315,7 +369,11 @@ def remind_pending_candidates(
     if not r:
         raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다.")
 
-    pending = [c for c in r.candidates if not c.booking]
+    pending = [
+        c
+        for c in r.candidates
+        if not c.booking and not getattr(c, "schedule_declined_at", None)
+    ]
     emails = 0
     sms = 0
     skipped = 0
@@ -508,11 +566,18 @@ def evaluations_aggregate(
                 if isinstance(v, (int, float)):
                     sc[str(k)] = int(v)
         assert sub.submitted_at is not None
+        cc: dict[str, str] = {}
+        raw_cc = sub.criteria_comments
+        if isinstance(raw_cc, dict):
+            cc = {str(k): str(v)[:4000] for k, v in raw_cc.items() if str(k).strip()}
         summaries.append(
             EvalSubmissionSummaryOut(
                 interviewer_name=inv.name if inv else "",
                 submitted_at=sub.submitted_at,
                 scores=sc,
+                criteria_comments=cc,
+                final_summary_line=sub.final_summary_line or "",
+                recommendation=sub.recommendation or "",
                 overall_comment=sub.overall_comment or "",
             )
         )
@@ -594,7 +659,7 @@ def get_schedule(
         .where(InterviewRound.id == round_id, InterviewRound.user_id == user.id)
         .options(
             selectinload(InterviewRound.slots),
-            selectinload(InterviewRound.candidates),
+            selectinload(InterviewRound.candidates).joinedload(InterviewCandidate.booking),
             selectinload(InterviewRound.interviewers),
         )
     )
@@ -602,14 +667,7 @@ def get_schedule(
     if not r:
         raise HTTPException(status_code=404, detail="일정을 찾을 수 없습니다.")
 
-    bookings = db.scalars(
-        select(InterviewBooking).join(InterviewSlot).where(InterviewSlot.round_id == r.id)
-    ).all()
-    by_cand = {str(b.candidate_id): str(b.slot_id) for b in bookings}
     base = _interview_round_public_dict(db, r)
-    base["has_bookings"] = len(bookings) > 0
-    for c in base["candidates"]:
-        c["booked_slot_id"] = by_cand.get(str(c["id"]))
     return base
 
 
@@ -637,8 +695,12 @@ def patch_schedule(
 
     if (
         body.title is None
+        and body.department is None
+        and body.job_title is None
+        and body.stage_key is None
         and body.timezone is None
         and body.hr_notify_email is None
+        and body.interview_phase is None
         and body.interviewee_per_slot is None
         and body.slots is None
         and body.candidates is None
@@ -648,10 +710,18 @@ def patch_schedule(
 
     if body.title is not None:
         r.title = body.title.strip() or "면접 일정"
+    if body.department is not None:
+        r.department = body.department.strip()[:400]
+    if body.job_title is not None:
+        r.job_title = body.job_title.strip()[:400]
+    if body.stage_key is not None:
+        r.stage_key = body.stage_key.strip()[:32]
     if body.timezone is not None:
         r.timezone = body.timezone.strip() or "Asia/Seoul"
     if body.hr_notify_email is not None:
         r.hr_notify_email = body.hr_notify_email.strip()
+    if body.interview_phase is not None:
+        r.interview_phase = _normalize_interview_phase(str(body.interview_phase))
 
     structural = body.slots is not None or body.candidates is not None or body.interviewers is not None
 
@@ -741,12 +811,15 @@ def patch_schedule(
                 )
             )
         for c in body.candidates:
+            aid = _validated_application_item_id(db, user.id, c.application_filter_item_id)
             db.add(
                 InterviewCandidate(
                     round_id=r.id,
                     name=c.name.strip(),
                     email=(c.email or "").strip(),
                     phone=(c.phone or "").strip(),
+                    applied_position=(c.applied_position or "").strip()[:400],
+                    application_filter_item_id=aid,
                 )
             )
         for inv in body.interviewers:

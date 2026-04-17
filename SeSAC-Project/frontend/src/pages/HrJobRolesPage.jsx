@@ -5,11 +5,12 @@ import {
   hrJobRolesDelete,
   hrJobRolesFromPdf,
   hrJobRolesList,
+  hrJobRolesPatchHeadcount,
   hrJobRolesRagSearch,
 } from '../api/client'
 
 function emptyDraftRow() {
-  return { department: '', job_title: '', role_grade: '', body_text: '' }
+  return { department: '', job_title: '', role_grade: '', headcount_to: 0, body_text: '' }
 }
 
 export function HrJobRolesPage() {
@@ -61,6 +62,7 @@ export function HrJobRolesPage() {
               department: j.department || '',
               job_title: j.job_title || '',
               role_grade: j.role_grade || '',
+              headcount_to: Number.isFinite(Number(j.headcount_to)) ? Number(j.headcount_to) : 0,
               body_text: j.body_text || '',
             }))
           : [emptyDraftRow()],
@@ -89,6 +91,7 @@ export function HrJobRolesPage() {
           department: (r.department || '').trim(),
           job_title: (r.job_title || '').trim(),
           role_grade: (r.role_grade || '').trim(),
+          headcount_to: Math.max(0, Math.min(9999, parseInt(String(r.headcount_to), 10) || 0)),
           body_text: (r.body_text || '').trim(),
         }))
       await hrJobRolesBulkReplace({
@@ -219,7 +222,7 @@ export function HrJobRolesPage() {
                 key={idx}
                 className="grid gap-2 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-700 dark:bg-slate-950/60"
               >
-                <div className="grid gap-2 sm:grid-cols-3">
+                <div className="grid gap-2 sm:grid-cols-4">
                   <input
                     placeholder="부서"
                     value={row.department}
@@ -247,6 +250,22 @@ export function HrJobRolesPage() {
                     }}
                     className="rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
                   />
+                  <label className="flex flex-col text-xs text-slate-600 dark:text-slate-400">
+                    TO(명)
+                    <input
+                      type="number"
+                      min={0}
+                      max={9999}
+                      value={row.headcount_to ?? 0}
+                      onChange={(e) => {
+                        const v = e.target.value
+                        setDraftJobs((arr) =>
+                          arr.map((x, i) => (i === idx ? { ...x, headcount_to: parseInt(v, 10) || 0 } : x)),
+                        )
+                      }}
+                      className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                    />
+                  </label>
                 </div>
                 <textarea
                   placeholder="직무 설명 본문"
@@ -330,6 +349,27 @@ export function HrJobRolesPage() {
                       {r.job_title}
                       {r.role_grade ? ` · ${r.role_grade}` : ''}
                     </p>
+                    <label className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-600 dark:text-slate-400">
+                      TO(정원) 명
+                      <input
+                        type="number"
+                        min={0}
+                        max={9999}
+                        defaultValue={r.headcount_to ?? 0}
+                        key={`${r.id}-hc`}
+                        onBlur={async (e) => {
+                          const n = Math.max(0, Math.min(9999, parseInt(e.target.value, 10) || 0))
+                          e.target.value = String(n)
+                          try {
+                            await hrJobRolesPatchHeadcount(r.id, n)
+                            await refreshSaved()
+                          } catch (err) {
+                            setError(err?.message || 'TO 저장 실패')
+                          }
+                        }}
+                        className="w-20 rounded border border-slate-300 px-2 py-1 text-sm text-slate-900 dark:border-slate-600 dark:bg-slate-950 dark:text-slate-100"
+                      />
+                    </label>
                     {r.source_document_name && (
                       <p className="text-xs text-slate-500">출처: {r.source_document_name}</p>
                     )}

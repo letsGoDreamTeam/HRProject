@@ -5,6 +5,7 @@ from openai import OpenAI
 from pydantic import BaseModel, Field
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 
 class JdGateRejected(Exception):
@@ -59,6 +60,12 @@ def run_jd_input_gate(jd_text: str, settings: Settings) -> JdGateResult:
             },
         ],
         response_format={"type": "json_schema", "json_schema": _gate_json_schema()},
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=settings.openai_gate_model,
+        feature="jd_input_gate",
+        request_kind="chat",
     )
     raw = completion.choices[0].message.content
     if not raw:

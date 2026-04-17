@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Annotated
 from uuid import UUID
 
@@ -10,10 +10,18 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
+from app.config import get_settings
 from app.database import get_db
-from app.deps_auth import require_admin
-from app.models_hr import NotificationOutbox, User
-from app.schemas_hr import UserAdminPatch, UserAdminPatchByEmail, UserAdminPublic
+from app.deps_auth import require_admin, require_can_manage_admin_roles
+from app.models_hr import NotificationOutbox, OpenAITokenUsage, User
+from app.schemas_hr import (
+    OpenAITokenUsageByModelOut,
+    OpenAITokenUsageSummaryOut,
+    UserAdminPatch,
+    UserAdminPatchByEmail,
+    UserAdminPublic,
+)
+from app.services.hr_job_roles_rag import remove_user_job_roles_rag_file
 from app.services.outbox_runner import DEAD_PREFIX
 
 router = APIRouter(prefix="/api/hr/admin", tags=["hr-admin"])
@@ -60,7 +68,7 @@ def list_users(
 @router.patch("/users/by-email", response_model=UserAdminPublic)
 def patch_user_admin_by_email(
     body: UserAdminPatchByEmail,
-    admin: Annotated[User, Depends(require_admin)],
+    admin: Annotated[User, Depends(require_can_manage_admin_roles)],
     db: Annotated[Session | None, Depends(get_db)],
 ):
     """이메일로 특정 사용자 관리자 권한 부여·해지."""
@@ -78,7 +86,7 @@ def patch_user_admin_by_email(
 def patch_user_admin_flag(
     user_id: UUID,
     body: UserAdminPatch,
-    admin: Annotated[User, Depends(require_admin)],
+    admin: Annotated[User, Depends(require_can_manage_admin_roles)],
     db: Annotated[Session | None, Depends(get_db)],
 ):
     if db is None:
@@ -88,6 +96,39 @@ def patch_user_admin_flag(
         raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
     _apply_admin_flag(db, admin=admin, target=target, new_is_admin=body.is_admin)
     return _user_to_public(target)
+
+
+@router.delete("/users/{user_id}")
+def delete_user_account(
+    user_id: UUID,
+    admin: Annotated[User, Depends(require_can_manage_admin_roles)],
+    db: Annotated[Session | None, Depends(get_db)],
+):
+    """다른 사용자 계정 및 CASCADE HR 데이터 삭제. 본인·유일 관리자 삭제 불가."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="DATABASE_URL이 설정되지 않았습니다.")
+    if user_id == admin.id:
+        raise HTTPException(status_code=400, detail="본인 계정은 삭제할 수 없습니다.")
+    target = db.get(User, user_id)
+    if not target:
+        raise HTTPException(status_code=404, detail="사용자를 찾을 수 없습니다.")
+    if target.is_admin:
+        admin_cnt = int(db.scalar(select(func.count()).select_from(User).where(User.is_admin.is_(True))) or 0)
+        if admin_cnt <= 1:
+            raise HTTPException(
+                status_code=400,
+                detail="유일한 관리자 계정은 삭제할 수 없습니다. 다른 관리자를 지정한 뒤 시도하세요.",
+            )
+
+    settings = get_settings()
+    try:
+        remove_user_job_roles_rag_file(settings, target.id)
+    except OSError:
+        pass
+
+    db.delete(target)
+    db.commit()
+    return {"ok": True, "deleted_id": str(user_id)}
 
 
 @router.get("/notifications/summary")
@@ -189,3 +230,50 @@ def retry_notification(
     row.last_error = ""
     db.commit()
     return {"ok": True, "id": str(notification_id)}
+
+
+@router.get("/token-usage/summary", response_model=OpenAITokenUsageSummaryOut)
+def token_usage_summary(
+    _: Annotated[User, Depends(require_admin)],
+    db: Annotated[Session | None, Depends(get_db)],
+    days: int = 7,
+):
+    """모델별 OpenAI 토큰 사용량 집계."""
+    if db is None:
+        raise HTTPException(status_code=503, detail="DATABASE_URL이 설정되지 않았습니다.")
+    days = max(1, min(int(days), 90))
+    to_at = datetime.now(UTC)
+    from_at = to_at - timedelta(days=days)
+
+    grouped = db.execute(
+        select(
+            OpenAITokenUsage.model,
+            func.coalesce(func.sum(OpenAITokenUsage.prompt_tokens), 0).label("prompt_tokens"),
+            func.coalesce(func.sum(OpenAITokenUsage.completion_tokens), 0).label("completion_tokens"),
+            func.coalesce(func.sum(OpenAITokenUsage.total_tokens), 0).label("total_tokens"),
+            func.count(OpenAITokenUsage.id).label("requests"),
+        )
+        .where(OpenAITokenUsage.created_at >= from_at, OpenAITokenUsage.created_at <= to_at)
+        .group_by(OpenAITokenUsage.model)
+        .order_by(func.coalesce(func.sum(OpenAITokenUsage.total_tokens), 0).desc())
+    ).all()
+
+    by_model = [
+        OpenAITokenUsageByModelOut(
+            model=str(r.model or "(unknown)"),
+            prompt_tokens=int(r.prompt_tokens or 0),
+            completion_tokens=int(r.completion_tokens or 0),
+            total_tokens=int(r.total_tokens or 0),
+            requests=int(r.requests or 0),
+        )
+        for r in grouped
+    ]
+    return OpenAITokenUsageSummaryOut(
+        from_at=from_at,
+        to_at=to_at,
+        total_prompt_tokens=sum(x.prompt_tokens for x in by_model),
+        total_completion_tokens=sum(x.completion_tokens for x in by_model),
+        total_tokens=sum(x.total_tokens for x in by_model),
+        total_requests=sum(x.requests for x in by_model),
+        by_model=by_model,
+    )

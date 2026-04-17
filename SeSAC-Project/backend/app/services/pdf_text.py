@@ -5,6 +5,7 @@ from io import BytesIO
 from openai import OpenAI
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 OCR_USER_PROMPT = """이 이미지는 채용 공고 등 문서 PDF의 한 페이지입니다.
 보이는 모든 인쇄 텍스트를 원래 읽는 순서대로 전사(transcribe)하세요.
@@ -89,6 +90,12 @@ def _ocr_single_page_worker(idx: int, png: bytes, total: int, settings: Settings
                 ],
             }
         ],
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=model,
+        feature="pdf_ocr_page",
+        request_kind="chat",
     )
     part = (completion.choices[0].message.content or "").strip()
     return idx, part

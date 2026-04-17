@@ -8,6 +8,7 @@ from typing import Any
 from openai import OpenAI
 
 from app.config import Settings
+from app.services.openai_usage_tracker import record_openai_usage
 
 SYSTEM = """당신은 채용·HR 문서를 구조화하는 전문가입니다.
 입력은 회사 소개, 채용 공고, 직무 기술서, 조직 문화 등이 한 문서에 섞여 있을 수 있는 한국어(또는 혼합) 텍스트입니다.
@@ -83,6 +84,12 @@ def split_company_profile_document(*, document_text: str, settings: Settings) ->
             },
         ],
         response_format={"type": "json_schema", "json_schema": SCHEMA},
+    )
+    record_openai_usage(
+        usage=getattr(completion, "usage", None),
+        model=settings.openai_model,
+        feature="company_profile_split",
+        request_kind="chat",
     )
     raw = completion.choices[0].message.content
     if not raw:

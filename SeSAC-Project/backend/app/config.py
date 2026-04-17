@@ -30,6 +30,18 @@ class Settings(BaseSettings):
     pdf_ocr_concurrency: int = 6
     # 추출 텍스트 품질 최소 길이(미만이면 low quality로 기록)
     resume_text_min_chars: int = 120
+    # PDF 변환용 원본(docx/rtf 등) DB 보관 상한(바이트). 초과 시 blob 미저장·원본 PDF만 변환 API 불가.
+    resume_source_blob_max_bytes: int = 12 * 1024 * 1024
+    # 원본 이력서 객체 저장소: local(디스크) | s3
+    resume_object_store_backend: str = "local"
+    resume_object_store_local_dir: str = ".resume_objects"
+    # S3 백엔드 사용 시 (resume_object_store_backend=s3)
+    resume_object_store_s3_bucket: str = ""
+    resume_object_store_s3_prefix: str = "resume-objects"
+    resume_object_store_s3_region: str = ""
+    # 원본 Office→PDF: AWS 등에서 LibreOffice 없이 외부 변환 HTTP만 쓰려면 URL 설정(POST, 아래 office_pdf_convert 모듈 주석 참고).
+    resume_office_to_pdf_http_url: str = ""
+    resume_office_to_pdf_http_bearer: str = ""
     # 통합 직무소개서: 텍스트 청크 크기·병렬 추출 워커(청크당 1회 LLM)
     hr_job_pdf_chunk_size: int = 8_000
     hr_job_pdf_chunk_overlap: int = 400
@@ -42,9 +54,9 @@ class Settings(BaseSettings):
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"
     # 면접 일정 선택 링크(이메일/SMS). 비우면 CORS_ORIGINS 첫 항목 사용.
     frontend_public_url: str = ""
-    # A-PASS: 인재상 RAG 임베딩·로컬 벡터 저장 경로
-    apass_embedding_model: str = "text-embedding-3-small"
-    apass_data_dir: str = ".apass_data"
+    # HR 직무 RAG 등: OpenAI 임베딩 모델·로컬 JSON 벡터 저장 디렉터리
+    embedding_model: str = "text-embedding-3-small"
+    vector_data_dir: str = ".vector_data"
     # --- HR / 인증 ---
     jwt_secret: str = "dev-change-me-in-production"
     jwt_algorithm: str = "HS256"
@@ -52,6 +64,8 @@ class Settings(BaseSettings):
     default_timezone: str = "Asia/Seoul"
     # 첫 가입 사용자를 관리자로 올릴 이메일(쉼표 구분). 비우면 is_admin은 요청값만 반영.
     bootstrap_admin_emails: str = ""
+    # 다른 계정의 관리자(is_admin) 부여·해제를 허용할 이메일(쉼표 구분, 소문자 비교). 비우면 모든 관리자가 변경 가능(기존 동작).
+    hr_super_admin_emails: str = ""
     # SMTP (불합격·일정·리마인더 메일). 비우면 메일은 로그만.
     smtp_host: str = ""
     smtp_port: int = 587
@@ -95,6 +109,11 @@ class Settings(BaseSettings):
     @classmethod
     def _clamp_resume_min_chars(cls, v: int) -> int:
         return max(20, min(int(v), 5000))
+
+    @field_validator("resume_source_blob_max_bytes")
+    @classmethod
+    def _clamp_resume_blob(cls, v: int) -> int:
+        return max(256 * 1024, min(int(v), 50 * 1024 * 1024))
 
     @field_validator("hr_job_pdf_extract_workers")
     @classmethod

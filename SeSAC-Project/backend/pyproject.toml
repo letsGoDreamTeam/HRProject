@@ -1,7 +1,7 @@
 [project]
 name = "interview-copilot-api"
 version = "0.1.0"
-description = "JD 분석 → 면접 질문 코파일럿 API"
+description = "HR 채용 운영 API"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi[standard]>=0.115.0",
