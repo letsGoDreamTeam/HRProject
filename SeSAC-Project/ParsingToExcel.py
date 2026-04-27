@@ -543,6 +543,37 @@ def _calc_confidence(
     return "낮음"
 
 
+def _finalize_parsed_record(parsed: dict) -> dict:
+    """추출 실패/누락 시 안전값으로 보정"""
+    required_keys = [
+        "이름", "생년월일", "연락처", "이메일", "주소",
+        "원문 지원직무", "최종학력", "경력기간", "경력회사", "경력직무",
+    ]
+
+    normalized: dict[str, str] = {}
+    for k in required_keys:
+        v = parsed.get(k, "")
+        if v is None:
+            v = ""
+        normalized[k] = str(v).strip()
+
+    # 카테고리성 정보는 누락 시 '기타'로 보정
+    if not normalized["원문 지원직무"]:
+        normalized["원문 지원직무"] = "기타"
+    if not normalized["최종학력"]:
+        normalized["최종학력"] = "기타"
+    if not normalized["경력직무"] and normalized["경력기간"]:
+        normalized["경력직무"] = "기타"
+    if not normalized["경력회사"] and normalized["경력기간"]:
+        normalized["경력회사"] = "기타"
+
+    # 부가 필드는 기존 값 유지
+    for k, v in parsed.items():
+        if k not in normalized:
+            normalized[k] = "" if v is None else str(v).strip()
+    return normalized
+
+
 def _extract_json_object(text: str) -> dict:
     """모델 응답에서 첫 JSON 객체를 추출"""
     text = text.strip()
@@ -1208,7 +1239,7 @@ def extract_from_docx(filepath: str, original_filename: str) -> dict:
     if _should_use_ai():
         ai = _ai_extract_fields(clean_flat, original_filename, "DOCX")
         parsed = _merge_ai_result(parsed, ai, clean_flat)
-    return parsed
+    return _finalize_parsed_record(parsed)
 
 
 # ─── PDF 파싱 (PyMuPDF) ─────────────────────────────────────────────────────
@@ -1257,7 +1288,7 @@ def extract_from_pdf(doc: fitz.Document, original_filename: str) -> dict:
     if _should_use_ai():
         ai = _ai_extract_fields(clean_text, original_filename, "PDF")
         parsed = _merge_ai_result(parsed, ai, clean_text)
-    return parsed
+    return _finalize_parsed_record(parsed)
 
 
 def extract_from_hwp_pyhwp(filepath: str, original_filename: str) -> dict:
@@ -1329,7 +1360,7 @@ def extract_from_hwp_pyhwp(filepath: str, original_filename: str) -> dict:
     if _should_use_ai():
         ai = _ai_extract_fields(clean_text, original_filename, "HWP")
         parsed = _merge_ai_result(parsed, ai, clean_text)
-    return parsed
+    return _finalize_parsed_record(parsed)
 
 
 # ─── 엑셀 저장 ──────────────────────────────────────────────────────────────
