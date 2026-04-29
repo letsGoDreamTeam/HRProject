@@ -14,7 +14,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password: str):
     # DEBUG
-    # print("🔥 HASH FUNCTION CALLED")
+    # print("HASH FUNCTION CALLED")
     # print("VALUE:", password)
     # print("TYPE:", type(password))
     # print("LENGTH:", len(password))
@@ -43,5 +43,5 @@ def decode_access_token(token: str):
 
 
     # def get_password_hash(password: str):
-    # password = password[:72]   # 🔥 safety
+    # password = password[:72]   # safety
     # return pwd_context.hash(password)
