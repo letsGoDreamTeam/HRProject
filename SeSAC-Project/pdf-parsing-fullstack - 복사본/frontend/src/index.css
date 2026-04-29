@@ -1,0 +1,167 @@
+@import "tailwindcss";
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700&display=swap");
+
+:root {
+  --bg-a: #f1fbff;
+  --bg-b: #fff7eb;
+  --ink: #13222f;
+  --muted: #607183;
+  --line: #d7e6ef;
+  --brand: #0ea5e9;
+  --brand-strong: #0b74a8;
+  --surface: #ffffffc9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100dvh;
+  font-family: "Manrope", "Noto Sans KR", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(circle at 12% -4%, #9be5ff66, transparent 38%),
+    radial-gradient(circle at 88% -8%, #ffd19b66, transparent 36%),
+    linear-gradient(160deg, var(--bg-a), var(--bg-b));
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  min-height: 100dvh;
+  padding: 12px;
+}
+
+.app-shell {
+  position: relative;
+  max-width: 1480px;
+  margin: 0 auto;
+  height: calc(100dvh - 24px);
+  border-radius: 24px;
+  overflow: hidden;
+  border: 1px solid #ffffff66;
+  background: linear-gradient(180deg, #ffffffd9, #fffcf8d4);
+  box-shadow:
+    0 24px 60px #11425f1a,
+    0 1px 0 #ffffffa8 inset;
+}
+
+.app-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(1400px 300px at -10% 0%, #8ad7ff26, transparent 60%),
+    radial-gradient(1200px 280px at 110% 100%, #ffd1a126, transparent 58%);
+}
+
+.app-header {
+  backdrop-filter: blur(14px);
+  background: linear-gradient(180deg, #ffffffec, #ffffffd8);
+}
+
+.app-header > div span {
+  font-family: "Sora", "Manrope", sans-serif;
+  letter-spacing: -0.02em;
+}
+
+.app-tabs .tab-btn {
+  border: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.app-tabs .tab-btn.bg-indigo-50.text-indigo-700.font-semibold {
+  color: #ffffff !important;
+  border-color: #0b74a84d !important;
+  background: linear-gradient(135deg, var(--brand), var(--brand-strong)) !important;
+  box-shadow: 0 8px 18px #0ea5e92b;
+}
+
+.app-content,
+.parse-panel,
+.questions-area {
+  scrollbar-width: thin;
+  scrollbar-color: #adc7d8 #ffffff66;
+}
+
+.setup-panel,
+.save-bar {
+  background: #ffffffd4;
+  backdrop-filter: blur(10px);
+}
+
+.setup-grid > .space-y-2.w-64 {
+  width: 19rem;
+}
+
+.upload-dropzone {
+  background:
+    linear-gradient(180deg, #ffffffc7, #f7fdffbf),
+    repeating-linear-gradient(
+      -45deg,
+      transparent,
+      transparent 10px,
+      #e4f4fc80 10px,
+      #e4f4fc80 20px
+    );
+}
+
+.question-section {
+  border-color: #d9e8f0;
+  box-shadow: 0 8px 24px #0f27420b;
+}
+
+.question-row {
+  transition:
+    transform 0.2s ease,
+    background-color 0.2s ease;
+}
+
+.question-row:hover {
+  transform: translateX(2px);
+}
+
+.data-table-shell {
+  border-color: #d3e3ec;
+  background: #fffdfb;
+}
+
+@media (max-width: 1024px) {
+  #root {
+    padding: 8px;
+  }
+
+  .app-shell {
+    height: calc(100dvh - 16px);
+    border-radius: 18px;
+  }
+
+  .app-header {
+    height: auto !important;
+    gap: 10px !important;
+    padding: 12px 14px !important;
+    flex-wrap: wrap;
+  }
+
+  .setup-grid {
+    flex-direction: column;
+    align-items: stretch !important;
+  }
+
+  .setup-grid > .space-y-2.w-64 {
+    width: 100%;
+  }
+
+  .collapsed-setup {
+    flex-wrap: wrap;
+    row-gap: 8px;
+  }
+
+  .save-bar > div {
+    flex-wrap: wrap;
+    gap: 10px !important;
+  }
+}
