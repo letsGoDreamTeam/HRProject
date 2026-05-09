@@ -146,7 +146,7 @@ export default function PageAccessControl() {
       {/* 규칙 리스트 (카드 형태) */}
       <div className="grid grid-cols-1 gap-4">
         {/* 💡 테이블 컨테이너: 둥근 모서리와 그림자 적용 */}
-        <div className="bg-white border border-slate-200 rounded-[24px] overflow-hidden shadow-sm">
+        <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-sm">
           <div className="overflow-x-auto">
             <table className="w-full text-left border-collapse">
               {/* 테이블 헤더 */}
