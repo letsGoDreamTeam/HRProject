@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from "reac
 import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Applicant } from "@/types/applicant";
+import { EmailTemplate } from "@/types/emailTemplate";
 import { AvailableInterviewSlot } from "@/types/interviewBooking";
 import { HrInterviewer } from "@/types/interviewer";
 import { Position } from "@/types/position";
@@ -23,6 +24,7 @@ export type ScheduleBookingModalTab = "slots" | "booking";
 interface ScheduleBookingModalProps {
   isOpen: boolean;
   applicants: Applicant[];
+  emailTemplates: EmailTemplate[];
   onClose: () => void;
   /** 모달이 열릴 때 기본 탭 (시간대·슬롯 / 예약 초대) */
   initialMainTab?: ScheduleBookingModalTab;
@@ -118,6 +120,7 @@ const createMockInvitationSlots = (): AvailableInterviewSlot[] => {
 export default function ScheduleBookingModal({
   isOpen,
   applicants,
+  emailTemplates,
   onClose,
   initialMainTab = "slots",
   initialInterviewDate,
@@ -160,6 +163,9 @@ export default function ScheduleBookingModal({
   >([]);
   const [invitationResults, setInvitationResults] = useState<
     InvitationResultRow[] | null
+  >(null);
+  const [selectedEmailTemplateId, setSelectedEmailTemplateId] = useState<
+    number | null
   >(null);
 
   const [isLoadingPositions, setIsLoadingPositions] = useState(false);
@@ -210,6 +216,7 @@ export default function ScheduleBookingModal({
     setInterviewers([]);
     setSelectedInvitationSlotIds([]);
     setInvitationResults(null);
+    setSelectedEmailTemplateId(emailTemplates[0]?.id ?? null);
     setErrorMessage("");
     setIsLoadingPositions(true);
 
@@ -245,7 +252,7 @@ export default function ScheduleBookingModal({
     return () => {
       ignore = true;
     };
-  }, [isOpen, applicants, initialMainTab, initialInterviewDate]);
+  }, [isOpen, applicants, initialMainTab, initialInterviewDate, emailTemplates]);
 
   const positionOptions = useMemo(() => {
     const fromApi = positions.slice();
@@ -1230,6 +1237,28 @@ export default function ScheduleBookingModal({
                     )로 지원자가 직접 슬롯을 고릅니다. 아래에서 선택한 슬롯만
                     초대 링크에 열리며, 링크 생성 후 지원자 메일로 발송됩니다.
                   </div>
+
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[11px] font-bold text-slate-500">
+                      메일 템플릿
+                    </span>
+                    <select
+                      value={selectedEmailTemplateId ?? ""}
+                      onChange={(e) =>
+                        setSelectedEmailTemplateId(
+                          e.target.value ? Number(e.target.value) : null,
+                        )
+                      }
+                      className="rounded-xl border border-slate-200 px-3 py-2.5 text-sm font-bold focus:border-slate-900 focus:ring-2 focus:ring-slate-900/10"
+                    >
+                      <option value="">기본 템플릿 사용</option>
+                      {emailTemplates.map((template) => (
+                        <option key={template.id} value={template.id}>
+                          {template.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
                   <label className="flex flex-col gap-1">
                     <span className="text-[11px] font-bold text-slate-500">

@@ -3,13 +3,18 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Applicant } from "@/types/applicant";
+import { EmailTemplate } from "@/types/emailTemplate";
 import ScheduleBookingModal from "./ScheduleBookingModal";
 
 interface DashboardHeaderProps {
   applicants: Applicant[];
+  emailTemplates: EmailTemplate[];
 }
 
-export default function DashboardHeader({ applicants }: DashboardHeaderProps) {
+export default function DashboardHeader({
+  applicants,
+  emailTemplates,
+}: DashboardHeaderProps) {
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
 
   return (
@@ -42,6 +47,7 @@ export default function DashboardHeader({ applicants }: DashboardHeaderProps) {
       <ScheduleBookingModal
         isOpen={isScheduleModalOpen}
         applicants={applicants}
+        emailTemplates={emailTemplates}
         onClose={() => setIsScheduleModalOpen(false)}
       />
     </div>

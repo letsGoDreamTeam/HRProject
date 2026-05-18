@@ -80,6 +80,7 @@ export default function ScheduleClient({
   initialPositions,
   initialApplicants,
   initialInterviewers,
+  initialEmailTemplates,
   initialMonth,
 }: ScheduleClientProps) {
   const [monthCursor, setMonthCursor] = useState(() =>
@@ -556,6 +557,7 @@ export default function ScheduleClient({
       <ScheduleBookingModal
         isOpen={bookingModalOpen}
         applicants={initialApplicants}
+        emailTemplates={initialEmailTemplates}
         initialMainTab={bookingModalTab}
         initialInterviewDate={modalInterviewDateSeed}
         onClose={() => {

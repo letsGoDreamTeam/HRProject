@@ -1,19 +1,20 @@
 import { Applicant } from "@/types/applicant";
+import { EmailTemplate } from "@/types/emailTemplate";
 import {
   InterviewRoundWrite,
-  InterviewSlotDetailItem,
   InterviewSlotListItem,
 } from "@/types/interviewSlotWrite";
 import { HrInterviewer } from "@/types/interviewer";
 import { Position } from "@/types/position";
 
-/** `/hr/schedule` SSR → 클라이언트로 전달되는 초기 데이터 */
+/** `/hr/schedule` SSR initial data */
 export interface ScheduleClientInitialData {
   initialSlots: InterviewSlotListItem[];
   initialPositions: Position[];
   initialApplicants: Applicant[];
   initialInterviewers: HrInterviewer[];
-  /** `yyyy-MM` (서버에서 date-fns format) */
+  initialEmailTemplates: EmailTemplate[];
+  /** `yyyy-MM` */
   initialMonth: string;
 }
 

@@ -11,6 +11,7 @@ import Q3TodayInterviews, {
 } from "@/components/hr/dashboard/Q3TodayInterviews";
 import DeptStatusDashboard from "@/components/hr/dashboard/DeptStatusDashboard";
 import { DeptStatus } from "@/types/hr";
+import { fetchEmailTemplatesServer } from "../server/hr/email-template.server";
 import {
   fetchApplicantsServer,
   fetchDeptStatusServer,
@@ -23,10 +24,12 @@ async function getDashboardData() {
     fetchApplicantsServer(),
     fetchInterviewSlotsServer(),
     fetchDeptStatusServer(),
+    fetchEmailTemplatesServer(),
   ]);
   const q2 = results[0];
   const q1 = results[1];
   const q4 = results[2];
+  const emailTemplates = results[3];
 
   const totalApplicants: number = q2.length;
   const activeJobs: number = new Set(
@@ -73,17 +76,17 @@ async function getDashboardData() {
 
   const q4Data: DeptStatus[] = q4;
 
-  return { q1Data, q2Data, q3Data, q4Data, applicants: q2 };
+  return { q1Data, q2Data, q3Data, q4Data, applicants: q2, emailTemplates };
 }
 
 export default async function HrDashboardPage() {
-  const { q1Data, q2Data, q3Data, q4Data, applicants } =
+  const { q1Data, q2Data, q3Data, q4Data, applicants, emailTemplates } =
     await getDashboardData();
 
   return (
     <div className="w-full animate-in fade-in duration-500">
       {/* 상단 헤더 및 모달 버튼 */}
-      <DashboardHeader applicants={applicants} />
+      <DashboardHeader applicants={applicants} emailTemplates={emailTemplates} />
 
       {/* 2x2 사분면 그리드 레이아웃 */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
