@@ -5,6 +5,7 @@ import {
   fetchMyInterviewerPositionId,
   fetchPositions,
 } from "../server/interviewer/interviewer.server";
+import { interviewerQuestion } from "@/lib/interviewer/interviewer-questions";
 
 export default async function InterviewerPage() {
   const [positionsData, candidatesData, myPositionId] = await Promise.all([
@@ -36,10 +37,14 @@ export default async function InterviewerPage() {
       </div>
 
       <div className="flex-1 min-h-0">
-        <QuestionGenerationJobProvider>
+        <QuestionGenerationJobProvider
+          apiClient={interviewerQuestion}
+          agentPagePath="/interviewer"
+        >
           <AgentClient
             initialPositions={filteredPositionsData}
             initialCandidates={filteredCandidatesData}
+            questionApi={interviewerQuestion}
           />
         </QuestionGenerationJobProvider>
       </div>

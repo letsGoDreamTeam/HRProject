@@ -33,6 +33,12 @@ import type {
 
 const JOB_QUERY_KEY = "questionGenerationJob";
 
+type QuestionGenerationApi = {
+  createGenerationJob: typeof question.createGenerationJob;
+  getGenerationJob: typeof question.getGenerationJob;
+  getActiveGenerationJob: typeof question.getActiveGenerationJob;
+};
+
 type SuccessListener = (questions: UIGeneratedQuestion[]) => void;
 
 function mapToUiQuestions(
@@ -143,8 +149,12 @@ function QuestionGenerationJobToastHost({
 
 export function QuestionGenerationJobProvider({
   children,
+  apiClient = question,
+  agentPagePath = "/hr/ai-gen",
 }: {
   children: ReactNode;
+  apiClient?: QuestionGenerationApi;
+  agentPagePath?: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -187,7 +197,7 @@ export function QuestionGenerationJobProvider({
   );
 
   const createMutation = useMutation({
-    mutationFn: question.createGenerationJob,
+    mutationFn: apiClient.createGenerationJob,
     onSuccess: (data) => {
       setJobId(data.jobId);
       setJobError(null);
@@ -202,7 +212,7 @@ export function QuestionGenerationJobProvider({
 
   const jobQuery = useQuery({
     queryKey: [JOB_QUERY_KEY, jobId],
-    queryFn: () => question.getGenerationJob(jobId!),
+    queryFn: () => apiClient.getGenerationJob(jobId!),
     enabled: jobId != null,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
@@ -218,7 +228,7 @@ export function QuestionGenerationJobProvider({
 
     (async () => {
       try {
-        const active = await question.getActiveGenerationJob();
+        const active = await apiClient.getActiveGenerationJob();
         if (cancelled || !active) return;
         if (active.status === "queued" || active.status === "running") {
           setJobId(active.jobId);
@@ -231,7 +241,7 @@ export function QuestionGenerationJobProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [apiClient]);
 
   useEffect(() => {
     const job = jobQuery.data;
@@ -251,12 +261,12 @@ export function QuestionGenerationJobProvider({
           ? `면접 질문 ${uiItems.length}개가 생성되었습니다.`
           : "질문 생성이 완료되었습니다.",
         {
-          position: "bottom-right",
-          action: {
-            label: "결과 보기",
-            onClick: () => router.push("/hr/ai-gen"),
+            position: "bottom-right",
+            action: {
+              label: "결과 보기",
+              onClick: () => router.push(agentPagePath),
+            },
           },
-        },
       );
 
       queryClient.removeQueries({ queryKey: [JOB_QUERY_KEY, job.jobId] });
@@ -278,7 +288,7 @@ export function QuestionGenerationJobProvider({
       }, 0);
       queryClient.removeQueries({ queryKey: [JOB_QUERY_KEY, job.jobId] });
     }
-  }, [jobQuery.data, applySucceeded, queryClient, router]);
+  }, [jobQuery.data, agentPagePath, applySucceeded, queryClient, router]);
 
   const progress = useMemo(
     () => toToastProgress(jobQuery.data),
@@ -303,8 +313,8 @@ export function QuestionGenerationJobProvider({
   );
 
   const goToAgentPage = useCallback(() => {
-    router.push("/hr/ai-gen");
-  }, [router]);
+    router.push(agentPagePath);
+  }, [agentPagePath, router]);
 
   const value = useMemo<QuestionGenerationJobContextValue>(
     () => ({

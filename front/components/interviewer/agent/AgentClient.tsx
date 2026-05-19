@@ -16,11 +16,13 @@ import { question as questionAPI } from "@/lib/interviewer/questions";
 interface AgentClientProps {
   initialPositions: BackendPosition[];
   initialCandidates: BackendCandidate[];
+  questionApi?: Pick<typeof questionAPI, "saveQuestions">;
 }
 
 export default function AgentClient({
   initialPositions,
   initialCandidates,
+  questionApi = questionAPI,
 }: AgentClientProps) {
   const [selectedPositionId, setSelectedPositionId] = useState<number | null>(
     null,
@@ -110,7 +112,7 @@ export default function AgentClient({
         })),
       };
 
-      const result = await questionAPI.saveQuestions(payload);
+      const result = await questionApi.saveQuestions(payload);
       toast.success(result.message ?? "저장이 완료되었습니다.");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "저장에 실패했습니다."));
