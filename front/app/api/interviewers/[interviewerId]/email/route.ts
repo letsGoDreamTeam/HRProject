@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import nodemailer from "nodemailer";
+import { render } from "@react-email/render";
+import { createElement } from "react";
+import { Resend } from "resend";
 import { getBackendBaseUrl } from "@/app/server/http/fetch-backend";
+import InterviewerInviteEmail from "@/components/emails/InterviewerInviteEmail";
 
 type InterviewerInviteResponse = {
   inviteUrl?: string;
@@ -31,6 +34,14 @@ function replaceInviteTokens(content: string, inviteUrl: string): string {
     .replaceAll("{invite_url}", inviteUrl)
     .replaceAll("{invitation_url}", inviteUrl)
     .replaceAll("{access_link}", inviteUrl);
+}
+
+function buildPreviewText(subject: string, content: string): string {
+  const normalized = content.replace(/\s+/g, " ").trim();
+  if (!normalized) {
+    return subject;
+  }
+  return normalized.length > 90 ? `${normalized.slice(0, 87)}...` : normalized;
 }
 
 function getBearerFromAuthStorage(raw: string | undefined): string | null {
@@ -137,39 +148,40 @@ export async function POST(
       );
     }
 
-    const smtpHost = getRequiredEnv("SMTP_HOST");
-    const smtpPort = Number(process.env.SMTP_PORT ?? "465");
-    const smtpSecure = (process.env.SMTP_SECURE ?? "true") === "true";
-    const smtpUser = process.env.SMTP_USER ?? process.env.EMAIL_USER;
-    const smtpPass = process.env.SMTP_PASS ?? process.env.EMAIL_PASS;
-    const mailFrom = process.env.MAIL_FROM ?? smtpUser;
-
-    if (!smtpUser || !smtpPass || !mailFrom || !Number.isFinite(smtpPort)) {
-      throw new Error("SMTP configuration is invalid.");
+    const resendApiKey = getRequiredEnv("RESEND_API_KEY");
+    const mailFrom = process.env.MAIL_FROM?.trim() ?? process.env.RESEND_FROM?.trim();
+    if (!mailFrom) {
+      throw new Error("MAIL_FROM or RESEND_FROM is required.");
     }
 
-    const transporter = nodemailer.createTransport({
-      host: smtpHost,
-      port: smtpPort,
-      secure: smtpSecure,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-      connectionTimeout: 45000,
-      greetingTimeout: 45000,
-      socketTimeout: 45000,
+    const personalizedContent = replaceInviteTokens(content, inviteUrl);
+    const emailComponent = createElement(InterviewerInviteEmail, {
+      content: personalizedContent,
+      inviteUrl,
+      expiresAt,
+      previewText: buildPreviewText(subject, personalizedContent),
     });
 
-    await transporter.sendMail({
+    const [html, text] = await Promise.all([
+      render(emailComponent),
+      render(emailComponent, { plainText: true }),
+    ]);
+
+    const resend = new Resend(resendApiKey);
+    const emailResult = await resend.emails.send({
       from: mailFrom,
       to: interviewerEmail,
       subject,
-      text: replaceInviteTokens(content, inviteUrl),
+      html,
+      text,
     });
 
+    if (emailResult.error) {
+      throw new Error(emailResult.error.message);
+    }
+
     return NextResponse.json({
-      message: "Interviewer mail sent successfully from Next.js.",
+      message: "Interviewer mail sent successfully.",
       invite_url: inviteUrl,
       expires_at: expiresAt,
     });
