@@ -2,7 +2,6 @@ import hashlib
 import os
 import secrets
 from datetime import datetime, timedelta, timezone
-from typing import TypedDict
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -23,12 +22,6 @@ from app.repositories.interview_slot_repository import interview_slot_repository
 
 
 class InterviewerInviteService:
-    class _AvailabilityState(TypedDict):
-        decision: str
-        note: str | None
-        decided_at: datetime
-
-    _availability_by_token_hash: dict[str, _AvailabilityState] = {}
     @staticmethod
     def _hash_token(raw_token: str) -> str:
         return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
@@ -168,13 +161,12 @@ class InterviewerInviteService:
         ]
         slots.sort(key=lambda row: row.interview_starts_at)
 
-        state = self._availability_by_token_hash.get(invite.token_hash)
         return InterviewerAvailabilityResponse(
             interviewer=interviewer,
             expires_at=invite.expires_at,
-            decision=state["decision"] if state else None,
-            note=state["note"] if state else None,
-            decided_at=state["decided_at"] if state else None,
+            decision=invite.availability_decision,
+            note=invite.availability_note,
+            decided_at=invite.availability_decided_at,
             slots=slots[:20],
         )
 
@@ -190,11 +182,9 @@ class InterviewerInviteService:
             raise UnauthorizedException("지원하지 않는 응답 값입니다.")
 
         now = datetime.now(timezone.utc)
-        self._availability_by_token_hash[invite.token_hash] = self._AvailabilityState(
-            decision=decision,
-            note=(data.note or "").strip() or None,
-            decided_at=now,
-        )
+        invite.availability_decision = decision
+        invite.availability_note = (data.note or "").strip() or None
+        invite.availability_decided_at = now
         invite.last_used_at = now
         await db.commit()
 

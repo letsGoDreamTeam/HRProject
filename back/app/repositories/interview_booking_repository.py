@@ -162,6 +162,7 @@ class InterviewBookingRepository:
                     | (InterviewSlot.booking_deadline_at > now)
                 ),
             )
+            .options(selectinload(InterviewSlot.interviewers))
             .group_by(InterviewSlot.slot_id)
             .having(active_booking_count < InterviewSlot.capacity)
             .order_by(InterviewSlot.interview_starts_at, InterviewSlot.slot_id)

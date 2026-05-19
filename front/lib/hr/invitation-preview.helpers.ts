@@ -52,6 +52,7 @@ export function createMockDraft(): InvitationPreviewDraft {
       interviewEndsAt: new Date(base.getTime() + 30 * 60 * 1000).toISOString(),
       interviewLocation: "본사 3층 회의실 A",
       remainingCapacity: 3,
+      interviewerNames: ["Preview Interviewer A"],
     },
     {
       slotId: 9802,
@@ -64,6 +65,7 @@ export function createMockDraft(): InvitationPreviewDraft {
       ).toISOString(),
       interviewLocation: "온라인 Zoom",
       remainingCapacity: 1,
+      interviewerNames: ["Preview Interviewer B"],
     },
   ];
 

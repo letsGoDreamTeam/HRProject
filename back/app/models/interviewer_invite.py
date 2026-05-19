@@ -45,6 +45,18 @@ class InterviewerInvite(Base):
         DateTime(timezone=True),
         nullable=True,
     )
+    availability_decision: Mapped[str | None] = mapped_column(
+        String(20),
+        nullable=True,
+    )
+    availability_note: Mapped[str | None] = mapped_column(
+        String(1000),
+        nullable=True,
+    )
+    availability_decided_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True),
+        nullable=True,
+    )
     created_by_user_id: Mapped[int | None] = mapped_column(
         ForeignKey("users.user_id", ondelete="SET NULL"),
         nullable=True,

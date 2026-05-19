@@ -28,6 +28,7 @@ const createMockSlots = (): AvailableInterviewSlot[] => {
       interviewEndsAt: new Date(base.getTime() + 30 * 60 * 1000).toISOString(),
       interviewLocation: "본사 3층 회의실 A",
       remainingCapacity: 3,
+      interviewerNames: ["Mock Interviewer A"],
     },
     {
       slotId: 9002,
@@ -40,6 +41,7 @@ const createMockSlots = (): AvailableInterviewSlot[] => {
       ).toISOString(),
       interviewLocation: "온라인 Zoom",
       remainingCapacity: 1,
+      interviewerNames: ["Mock Interviewer B"],
     },
     {
       slotId: 9003,
@@ -52,12 +54,14 @@ const createMockSlots = (): AvailableInterviewSlot[] => {
       ).toISOString(),
       interviewLocation: "본사 5층 대회의실",
       remainingCapacity: 2,
+      interviewerNames: ["Mock Interviewer C"],
     },
   ];
 };
 
 const canUseMockSlots = () => {
-  if (process.env.NODE_ENV === "development") return true;
+  if (process.env.NEXT_PUBLIC_ENABLE_BOOKING_MOCK !== "true") return false;
+  if (process.env.NODE_ENV !== "development") return false;
   if (typeof window === "undefined") return false;
   return ["localhost", "127.0.0.1"].includes(window.location.hostname);
 };

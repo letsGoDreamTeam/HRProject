@@ -28,6 +28,7 @@ class AvailableInterviewSlotResponse(CaseModel):
     interview_ends_at: datetime
     interview_location: str | None
     remaining_capacity: int
+    interviewer_names: list[str] = Field(default_factory=list)
 
 
 class InterviewBookingResponse(CaseModel):

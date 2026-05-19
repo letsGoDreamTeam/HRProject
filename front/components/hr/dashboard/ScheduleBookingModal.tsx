@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import { Applicant } from "@/types/applicant";
 import { AvailableInterviewSlot } from "@/types/interviewBooking";
-import { HrInterviewer } from "@/types/interviewer";
 import { Position } from "@/types/position";
 import {
   InterviewRoundWrite,
@@ -14,7 +13,6 @@ import {
 } from "@/types/interviewSlotWrite";
 import { interviewBookingApi } from "@/lib/hr/interview-bookings.client";
 import { interviewBookingInvitationApi } from "@/lib/hr/interview-booking-invitations.client";
-import { interviewerApi } from "@/lib/hr/interviewers.client";
 import { interviewSlotsApi } from "@/lib/hr/interview-slots.client";
 import { positionApi } from "@/lib/hr/positions.client";
 
@@ -84,7 +82,8 @@ const isDocumentPassed = (a: Applicant) => a.application_status !== "서류";
 const rounds: InterviewRoundWrite[] = ["1차", "2차", "3차"];
 
 const canUseInvitationMock = () => {
-  if (process.env.NODE_ENV === "development") return true;
+  if (process.env.NEXT_PUBLIC_ENABLE_BOOKING_MOCK !== "true") return false;
+  if (process.env.NODE_ENV !== "development") return false;
   if (typeof window === "undefined") return false;
   return ["localhost", "127.0.0.1"].includes(window.location.hostname);
 };
@@ -100,6 +99,7 @@ const createMockInvitationSlots = (): AvailableInterviewSlot[] => {
       interviewEndsAt: new Date(base.getTime() + 30 * 60 * 1000).toISOString(),
       interviewLocation: "본사 3층 회의실 A",
       remainingCapacity: 3,
+      interviewerNames: ["Mock Interviewer A"],
     },
     {
       slotId: 9902,
@@ -112,6 +112,7 @@ const createMockInvitationSlots = (): AvailableInterviewSlot[] => {
       ).toISOString(),
       interviewLocation: "온라인 Zoom",
       remainingCapacity: 2,
+      interviewerNames: ["Mock Interviewer B"],
     },
   ];
 };
@@ -155,7 +156,6 @@ export default function ScheduleOperationsModal({
   const [availableSlots, setAvailableSlots] = useState<
     AvailableInterviewSlot[]
   >([]);
-  const [interviewers, setInterviewers] = useState<HrInterviewer[]>([]);
   const [selectedInvitationSlotIds, setSelectedInvitationSlotIds] = useState<
     number[]
   >([]);
@@ -208,7 +208,6 @@ export default function ScheduleOperationsModal({
     setExistingSlots([]);
     setBookingCandidateId(null);
     setAvailableSlots([]);
-    setInterviewers([]);
     setSelectedInvitationSlotIds([]);
     setInvitationResults(null);
     setErrorMessage("");
@@ -333,7 +332,6 @@ export default function ScheduleOperationsModal({
 
     if (!bookingCandidateId) {
       setAvailableSlots([]);
-      setInterviewers([]);
       setSelectedInvitationSlotIds([]);
       return;
     }
@@ -341,7 +339,6 @@ export default function ScheduleOperationsModal({
     const cand = applicants.find((a) => a.candidate_id === bookingCandidateId);
     if (!cand?.position_id) {
       setAvailableSlots([]);
-      setInterviewers([]);
       setSelectedInvitationSlotIds([]);
       setErrorMessage("지원자 직무 정보가 없습니다.");
       return;
@@ -351,23 +348,15 @@ export default function ScheduleOperationsModal({
     setIsLoadingBookingSlots(true);
     setErrorMessage("");
 
-    Promise.all([
-      interviewBookingApi.fetchAvailableSlots(bookingCandidateId),
-      interviewerApi.fetchInterviewers({
-        positionId: cand.position_id,
-        size: 100,
-      }),
-    ])
-      .then(([slots, interviewerList]) => {
+    Promise.all([interviewBookingApi.fetchAvailableSlots(bookingCandidateId)])
+      .then(([slots]) => {
         if (ignore) return;
         setAvailableSlots(slots);
-        setInterviewers(interviewerList.content);
         setSelectedInvitationSlotIds([]);
       })
       .catch((err: unknown) => {
         if (ignore) return;
         setAvailableSlots([]);
-        setInterviewers([]);
         setSelectedInvitationSlotIds([]);
         setErrorMessage(
           getApiErrorMessage(err, "예약 가능 슬롯을 불러오지 못했습니다."),
@@ -387,17 +376,6 @@ export default function ScheduleOperationsModal({
       prev.filter((id) => availableSlots.some((s) => s.slotId === id)),
     );
   }, [availableSlots]);
-
-  const interviewersByRound = useMemo(() => {
-    return interviewers.reduce<Record<string, HrInterviewer[]>>((acc, row) => {
-      if (!row.interviewRound) return acc;
-      acc[row.interviewRound] = [...(acc[row.interviewRound] ?? []), row];
-      return acc;
-    }, {});
-  }, [interviewers]);
-
-  const getSlotInterviewers = (slot: AvailableInterviewSlot) =>
-    interviewersByRound[slot.interviewRound] ?? [];
 
   const toggleId = (id: number) => {
     setSelectedIds((prev) =>
@@ -1304,7 +1282,6 @@ export default function ScheduleOperationsModal({
                       </div>
                       <ul className="custom-scrollbar max-h-56 space-y-2 overflow-y-auto">
                         {availableSlots.map((slot) => {
-                          const iv = getSlotInterviewers(slot);
                           const on = selectedInvitationSlotIds.includes(
                             slot.slotId,
                           );
@@ -1344,10 +1321,8 @@ export default function ScheduleOperationsModal({
                                     잔여 {slot.remainingCapacity}
                                   </p>
                                   <p className="mt-1 line-clamp-2 text-xs text-slate-400">
-                                    {iv.length
-                                      ? iv
-                                          .map((x) => x.interviewerName)
-                                          .join(", ")
+                                    {slot.interviewerNames.length
+                                      ? slot.interviewerNames.join(", ")
                                       : "면접관 정보 없음"}
                                   </p>
                                 </div>

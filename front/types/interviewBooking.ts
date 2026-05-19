@@ -5,6 +5,7 @@ export interface AvailableInterviewSlot {
   interviewEndsAt: string;
   interviewLocation: string | null;
   remainingCapacity: number;
+  interviewerNames: string[];
 }
 
 export interface InterviewBookingPayload {

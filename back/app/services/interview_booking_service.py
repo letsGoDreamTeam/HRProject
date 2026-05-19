@@ -48,6 +48,10 @@ class InterviewBookingService:
                 interview_ends_at=slot.interview_ends_at,
                 interview_location=slot.interview_location,
                 remaining_capacity=remaining_capacity,
+                interviewer_names=[
+                    interviewer.interviewer_name
+                    for interviewer in slot.interviewers
+                ],
             )
             for slot, remaining_capacity in slots
         ]
