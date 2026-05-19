@@ -15,6 +15,74 @@
   --font-mono: var(--font-geist-mono);
 }
 
+@theme {
+  --color-indigo-50: #f7fbff;
+  --color-indigo-100: #ecf5fd;
+  --color-indigo-200: #d8eaf9;
+  --color-indigo-300: #bdd6f2;
+  --color-indigo-400: #a4c6eb;
+  --color-indigo-500: #8cb3df;
+  --color-indigo-600: #729bca;
+  --color-indigo-700: #5d81a7;
+  --color-indigo-800: #4e6a88;
+  --color-indigo-900: #41566f;
+
+  --color-blue-50: #f7fbff;
+  --color-blue-100: #edf5fd;
+  --color-blue-200: #dbeafa;
+  --color-blue-300: #c3dbf4;
+  --color-blue-400: #abcceb;
+  --color-blue-500: #93b9dd;
+  --color-blue-600: #7aa2c3;
+  --color-blue-700: #6385a1;
+  --color-blue-800: #526c81;
+  --color-blue-900: #435869;
+
+  --color-sky-50: #f7fbff;
+  --color-sky-100: #eef6fd;
+  --color-sky-200: #dbeaf8;
+  --color-sky-300: #c4dcf2;
+  --color-sky-400: #add0e8;
+  --color-sky-500: #94bbd8;
+  --color-sky-600: #7da2bc;
+  --color-sky-700: #668398;
+  --color-sky-800: #546b7c;
+  --color-sky-900: #465863;
+
+  --color-violet-50: #faf8ff;
+  --color-violet-100: #f3effd;
+  --color-violet-200: #e5dcf8;
+  --color-violet-300: #d4c5f1;
+  --color-violet-400: #c0adde;
+  --color-violet-500: #aa96cb;
+  --color-violet-600: #907db1;
+  --color-violet-700: #766693;
+  --color-violet-800: #615476;
+  --color-violet-900: #514760;
+
+  --color-fuchsia-50: #fff8fc;
+  --color-fuchsia-100: #fceef6;
+  --color-fuchsia-200: #f7dce9;
+  --color-fuchsia-300: #efc4d8;
+  --color-fuchsia-400: #e1a9c3;
+  --color-fuchsia-500: #cb8daa;
+  --color-fuchsia-600: #ae7290;
+  --color-fuchsia-700: #8d5c74;
+  --color-fuchsia-800: #724b5d;
+  --color-fuchsia-900: #5e3f4d;
+
+  --color-amber-50: #fff9f2;
+  --color-amber-100: #fdf1e3;
+  --color-amber-200: #f9d8b4;
+  --color-amber-300: #f4c99f;
+  --color-amber-400: #e9b889;
+  --color-amber-500: #d8a171;
+  --color-amber-600: #bd865a;
+  --color-amber-700: #9b6d49;
+  --color-amber-800: #7b573b;
+  --color-amber-900: #654732;
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
@@ -66,9 +134,9 @@ body {
 }
 
 .custom-calendar .react-calendar__tile:enabled:hover {
-  background-color: #e0e7ff;
+  background-color: #ecf5fd;
   /* indigo-100 */
-  color: #4f46e5;
+  color: #729bca;
 }
 
 .custom-calendar .react-calendar__tile--now {
@@ -77,10 +145,10 @@ body {
 }
 
 .custom-calendar .react-calendar__tile--active {
-  background: #4f46e5 !important;
+  background: #8cb3df !important;
   /* indigo-600 */
   color: white !important;
-  box-shadow: 0 4px 14px rgba(79, 70, 229, 0.4);
+  box-shadow: 0 4px 14px rgba(140, 179, 223, 0.35);
 
 }
 

@@ -12,7 +12,7 @@ export default function HrClientWrapper({
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
   return (
-    <div className="flex min-h-screen bg-[#F8FAFC]">
+    <div className="flex min-h-screen bg-slate-50">
       <HrSidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}

@@ -14,7 +14,7 @@ export default function AdminClientWrapper({ children }: AdminClientWrapperProps
     const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
     return (
-        <div className="flex min-h-screen bg-[#F8FAFC]">
+        <div className="flex min-h-screen bg-slate-50">
 
             {/* 1. 사이드바 컴포넌트 렌더링 */}
             <AdminSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
@@ -56,7 +56,7 @@ export default function AdminClientWrapper({ children }: AdminClientWrapperProps
                 </header>
 
                 {/* 3. 본문 렌더링 영역 (children) */}
-                <main className="flex-1 overflow-y-auto bg-[#F1F5F9] p-5 md:p-8">
+                <main className="flex-1 overflow-y-auto bg-slate-100 p-5 md:p-8">
                     <div className="mx-auto max-w-7xl bg-white p-6 rounded-3xl border border-slate-200/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] min-h-[calc(100vh-160px)] animate-in fade-in duration-500">
                         {/* 여기에 서버에서 렌더링된 page.tsx 내용이 쏙 들어갑니다! */}
                         {children}

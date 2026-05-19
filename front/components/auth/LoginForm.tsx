@@ -113,7 +113,7 @@ const LoginForm = () => {
     <div className="relative min-h-screen w-full bg-white overflow-hidden font-['Pretendard']">
       {/* --- BACKGROUND LAYER --- */}
       <motion.div
-        className="absolute top-0 h-screen w-[300vw] z-6 shadow-2xl bg-linear-to-br from-[#70a7f0] to-[#1b3285] hidden md:block"
+        className="absolute top-0 h-screen w-[300vw] z-6 shadow-2xl bg-linear-to-br from-sky-200 to-sky-700 hidden md:block"
         initial={false}
         animate={isSignIn ? "signIn" : "signUp"}
         variants={bgVariants}
@@ -140,7 +140,7 @@ const LoginForm = () => {
         >
           <div className="p-16 text-center">
             <h2 className="text-6xl font-extrabold mb-4">Welcome</h2>
-            <div className="w-64 h-64 bg-[#1b3285]/20 rounded-full blur-2xl absolute -z-10" />
+            <div className="w-64 h-64 bg-sky-700/20 rounded-full blur-2xl absolute -z-10" />
           </div>
         </motion.div>
 
@@ -152,7 +152,7 @@ const LoginForm = () => {
         >
           <div className="p-16 text-center">
             <h2 className="text-6xl font-extrabold mb-4">Join with us</h2>
-            <div className="w-64 h-64 bg-[#1b3285]/20 rounded-full blur-2xl absolute -z-10" />
+            <div className="w-64 h-64 bg-sky-700/20 rounded-full blur-2xl absolute -z-10" />
           </div>
         </motion.div>
       </div>
@@ -171,7 +171,7 @@ const LoginForm = () => {
                 className="w-full max-w-md bg-white p-8 rounded-3xl shadow-2xl space-y-4"
                 onSubmit={handleSignUp}
               >
-                <h3 className="text-2xl font-bold text-[#000000] mb-6">
+                <h3 className="text-2xl font-bold text-slate-900 mb-6">
                   Sign Up
                 </h3>
                 <InputGroup
@@ -207,8 +207,8 @@ const LoginForm = () => {
                   disabled={disabled}
                 />
                 <button
-                  className="w-full py-3 bg-[#70a7f0] text-white 
-                                    rounded-lg font-semibold text-lg hover:bg-[#7584ad] transition-colors"
+                  className="w-full py-3 bg-sky-400 text-white 
+                                    rounded-lg font-semibold text-lg hover:bg-sky-500 transition-colors"
                   type="submit"
                   disabled={loading}
                 >
@@ -218,7 +218,7 @@ const LoginForm = () => {
                   Already have an account?{" "}
                   <span
                     onClick={toggle}
-                    className="font-bold cursor-pointer hover:underline text-[#000000]"
+                    className="font-bold cursor-pointer hover:underline text-slate-900"
                   >
                     Sign in here
                   </span>
@@ -240,7 +240,7 @@ const LoginForm = () => {
                 transition={{ delay: 0.5, duration: 0.5 }}
                 className="w-full max-w-md bg-white p-8 rounded-3xl shadow-2xl space-y-4"
               >
-                <h3 className="text-2xl font-bold text-[#000000] mb-6">
+                <h3 className="text-2xl font-bold text-slate-900 mb-6">
                   로그인
                 </h3>
                 <InputGroup
@@ -266,8 +266,8 @@ const LoginForm = () => {
                   className={`w-full py-3 rounded-lg font-semibold text-lg transition-all flex items-center justify-center gap-2
     ${
       loading
-        ? "bg-[#7584ad] text-white/80 cursor-not-allowed shadow-inner" // 로딩 중: 색상 톤다운 및 클릭 방지 느낌
-        : "bg-[#70a7f0] text-white hover:bg-[#7584ad] active:scale-[0.98]" // 평소: 원래 색상 및 클릭 액션
+        ? "bg-slate-400 text-white/80 cursor-not-allowed shadow-inner" // 로딩 중: 색상 톤다운 및 클릭 방지 느낌
+        : "bg-sky-400 text-white hover:bg-sky-500 active:scale-[0.98]" // 평소: 원래 색상 및 클릭 액션
     }
   `}
                 >
@@ -288,7 +288,7 @@ const LoginForm = () => {
                   아이디 생성{" "}
                   <span
                     onClick={toggle}
-                    className="font-bold cursor-pointer hover:underline text-[#000000]"
+                    className="font-bold cursor-pointer hover:underline text-slate-900"
                   >
                     회원가입 하러가기
                   </span>
@@ -321,7 +321,7 @@ const InputGroup = ({
   disabled,
 }: InputGroupProps) => (
   <div className="relative group">
-    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-[#4EA685]">
+    <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-amber-500">
       {icon}
     </span>
     <input
@@ -331,7 +331,7 @@ const InputGroup = ({
       value={value}
       onChange={(e) => onChange(e.target.value)}
       disabled={disabled}
-      className="w-full pl-12 pr-4 py-3 bg-gray-100 text-black rounded-lg outline-none border-2 border-transparent focus:border-[#446ea6] focus:bg-white transition-all text-sm"
+      className="w-full pl-12 pr-4 py-3 bg-gray-100 text-slate-900 rounded-lg outline-none border-2 border-transparent focus:border-sky-500 focus:bg-white transition-all text-sm"
     />
   </div>
 );

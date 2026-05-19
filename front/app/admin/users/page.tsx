@@ -26,7 +26,7 @@ export default async function AdminUsersPage({
   const data = await fetchUsersList(page, size, keyword);
 
   return (
-    <div className="min-h-[calc(100vh-80px)] bg-[#F8FAFC] p-6 md:p-10">
+    <div className="min-h-[calc(100vh-80px)] bg-slate-50 p-6 md:p-10">
       <div className="max-w-7xl mx-auto">
         {/* 헤더 타이틀 영역 */}
         <div className="mb-8">
