@@ -50,6 +50,9 @@ class QuestionSaveItem(CaseModel):
     question_type: str | None = Field(default=None, max_length=30)
     evaluation_intent: str | None = Field(default=None, max_length=2000)
     generation_basis: str | None = Field(default=None, max_length=2000)
+    candidate_id: int | None = Field(default=None, gt=0)
+    position_id: int | None = Field(default=None, gt=0)
+    generation_job_id: int | None = Field(default=None, gt=0)
 
     @field_validator("question_text")
     @classmethod
@@ -97,7 +100,14 @@ class QuestionSaveRequest(CaseModel):
 
     @model_validator(mode="after")
     def validate_target(self) -> "QuestionSaveRequest":
-        if self.position_id is None and self.candidate_id is None:
+        if self.position_id is not None or self.candidate_id is not None:
+            return self
+
+        has_item_target = any(
+            item.position_id is not None or item.candidate_id is not None
+            for item in self.questions
+        )
+        if not has_item_target:
             raise ValueError("position_id 또는 candidate_id가 필요합니다.")
 
         return self

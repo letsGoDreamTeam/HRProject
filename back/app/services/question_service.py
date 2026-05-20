@@ -1,4 +1,6 @@
-﻿from sqlalchemy.ext.asyncio import AsyncSession
+﻿from dataclasses import dataclass
+
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.graphs.interview_question import interview_question_graph
 from app.ai.schemas.question_generation import (
@@ -22,6 +24,7 @@ from app.repositories.question_repository import question_repository
 from app.schemas.question import (
     GeneratedQuestionResponse,
     QuestionGenerateRequest,
+    QuestionSaveItem,
     QuestionSaveRequest,
 )
 from app.services.job_description_service import job_description_service
@@ -31,6 +34,17 @@ from app.services.resume_context_service import resume_context_service
 POSITION_BASED_QUESTION_TYPE = "position_based"
 CANDIDATE_RESUME_BASED_QUESTION_TYPE = "candidate_resume_based"
 CANDIDATE_JOB_FIT_BASED_QUESTION_TYPE = "candidate_job_fit_based"
+
+
+@dataclass(frozen=True)
+class SaveQuestionItemContext:
+    question_text: str
+    question_type: str
+    evaluation_intent: str | None
+    generation_basis: str | None
+    candidate_id: int | None
+    position_id: int | None
+    generation_job_id: int | None
 
 
 class QuestionService:
@@ -102,62 +116,63 @@ class QuestionService:
         interviewer_data = data.model_copy(update={"position_id": interviewer.position_id})
         return await self.generate_questions(db, interviewer_data)
 
-    async def save_position_questions(self, db: AsyncSession, data: QuestionSaveRequest, created_by_user_id: int | None = None, created_by_interviewer_id: int | None = None) -> None:
-        resolved_position_id = data.position_id
+    async def save_position_questions(
+        self,
+        db: AsyncSession,
+        data: QuestionSaveRequest,
+        created_by_user_id: int | None = None,
+        created_by_interviewer_id: int | None = None,
+    ) -> None:
+        normalized_items = await self._normalize_save_question_items(db, data)
 
-        if data.candidate_id is not None:
-            candidate = await candidate_repository.find_by_id(db, data.candidate_id)
-            if not candidate:
-                raise NotFoundException("Candidate not found")
-            resolved_position_id = await self._resolve_save_position_id(db, candidate, data.position_id)
-        elif data.position_id is not None and not await position_repository.find_by_id(db, data.position_id):
-            raise NotFoundException("Position not found")
+        if created_by_interviewer_id is not None and data.position_id is not None:
+            for item in normalized_items:
+                if item.position_id != data.position_id:
+                    raise ForbiddenException("Cannot create questions for another position")
 
-        existing_questions = await question_repository.find_by_target(db, position_id=resolved_position_id, candidate_id=data.candidate_id)
-        existing_question_keys: set[tuple[str, str]] = set()
-        for existing_question in existing_questions:
-            if existing_question.question_text:
-                existing_question_keys.add((existing_question.question_type, existing_question.question_text.strip()))
-
-        question_items = self._get_unique_new_questions(data, existing_question_keys, resolved_position_id)
+        existing_question_keys_by_target = await self._build_existing_question_keys_by_target(
+            db,
+            normalized_items,
+        )
+        question_items = self._get_unique_new_questions(
+            normalized_items,
+            existing_question_keys_by_target,
+        )
         if not question_items:
             return
 
         await self._validate_generation_job_questions(
             db=db,
-            data=data,
             question_items=question_items,
-            resolved_position_id=resolved_position_id,
+            request_generation_job_id=data.generation_job_id,
             created_by_user_id=created_by_user_id,
             created_by_interviewer_id=created_by_interviewer_id,
         )
 
         questions = [
             Question(
-                candidate_id=data.candidate_id,
-                position_id=resolved_position_id,
-                question_text=question_text,
-                question_type=question_type,
-                evaluation_intent=evaluation_intent,
-                generation_basis=generation_basis,
+                candidate_id=item.candidate_id,
+                position_id=item.position_id,
+                question_text=item.question_text,
+                question_type=item.question_type,
+                evaluation_intent=item.evaluation_intent,
+                generation_basis=item.generation_basis,
                 created_by_user_id=created_by_user_id,
                 created_by_interviewer_id=created_by_interviewer_id,
             )
-            for (question_text, question_type, evaluation_intent, generation_basis) in question_items
+            for item in question_items
         ]
         question_repository.save_all(db, questions)
         await db.commit()
 
-    async def save_questions_for_interviewer(self, db: AsyncSession, interviewer: Interviewer, data: QuestionSaveRequest) -> None:
+    async def save_questions_for_interviewer(
+        self,
+        db: AsyncSession,
+        interviewer: Interviewer,
+        data: QuestionSaveRequest,
+    ) -> None:
         if interviewer.position_id is None:
             raise ForbiddenException("Interviewer position is required")
-
-        if data.candidate_id is not None:
-            candidate = await candidate_repository.find_by_id(db, data.candidate_id)
-            if not candidate:
-                raise NotFoundException("Candidate not found")
-            if candidate.position_id != interviewer.position_id:
-                raise ForbiddenException("Cannot create questions for another position")
 
         interviewer_data = data.model_copy(update={"position_id": interviewer.position_id})
         await self.save_position_questions(
@@ -214,22 +229,109 @@ class QuestionService:
             return fallback_position_id
         return None
 
-    def _get_unique_new_questions(self, data: QuestionSaveRequest, existing_question_keys: set[tuple[str, str]], resolved_position_id: int | None) -> list[tuple[str, str, str | None, str | None]]:
-        question_items: list[tuple[str, str, str | None, str | None]] = []
-        seen_question_keys = set(existing_question_keys)
-        default_question_type = self._get_default_save_question_type(data, resolved_position_id)
+    async def _normalize_save_question_items(
+        self,
+        db: AsyncSession,
+        data: QuestionSaveRequest,
+    ) -> list[SaveQuestionItemContext]:
+        normalized_items: list[SaveQuestionItemContext] = []
         for question in data.questions:
-            question_type = question.question_type or data.question_type or default_question_type
-            question_key = (question_type, question.question_text)
+            candidate_id = self._resolve_item_candidate_id(data, question)
+            fallback_position_id = self._resolve_item_position_id(data, question)
+            resolved_position_id = fallback_position_id
+            generation_job_id = self._resolve_item_generation_job_id(data, question)
+
+            if candidate_id is not None:
+                candidate = await candidate_repository.find_by_id(db, candidate_id)
+                if not candidate:
+                    raise NotFoundException("Candidate not found")
+                resolved_position_id = await self._resolve_save_position_id(
+                    db,
+                    candidate,
+                    fallback_position_id,
+                )
+            elif fallback_position_id is not None and not await position_repository.find_by_id(
+                db,
+                fallback_position_id,
+            ):
+                raise NotFoundException("Position not found")
+
+            question_type = (
+                question.question_type
+                or data.question_type
+                or self._get_default_save_question_type(candidate_id, resolved_position_id)
+            )
+
+            normalized_items.append(
+                SaveQuestionItemContext(
+                    question_text=question.question_text,
+                    question_type=question_type,
+                    evaluation_intent=question.evaluation_intent,
+                    generation_basis=question.generation_basis,
+                    candidate_id=candidate_id,
+                    position_id=resolved_position_id,
+                    generation_job_id=generation_job_id,
+                )
+            )
+
+        return normalized_items
+
+    async def _build_existing_question_keys_by_target(
+        self,
+        db: AsyncSession,
+        question_items: list[SaveQuestionItemContext],
+    ) -> dict[tuple[int | None, int | None], set[tuple[str, str]]]:
+        existing_question_keys_by_target: dict[
+            tuple[int | None, int | None],
+            set[tuple[str, str]],
+        ] = {}
+
+        targets = {(item.candidate_id, item.position_id) for item in question_items}
+        for candidate_id, position_id in targets:
+            existing_questions = await question_repository.find_by_target(
+                db,
+                position_id=position_id,
+                candidate_id=candidate_id,
+            )
+            existing_question_keys_by_target[(candidate_id, position_id)] = {
+                (existing_question.question_type, existing_question.question_text.strip())
+                for existing_question in existing_questions
+                if existing_question.question_text
+            }
+
+        return existing_question_keys_by_target
+
+    def _get_unique_new_questions(
+        self,
+        question_items: list[SaveQuestionItemContext],
+        existing_question_keys_by_target: dict[
+            tuple[int | None, int | None],
+            set[tuple[str, str]],
+        ],
+    ) -> list[SaveQuestionItemContext]:
+        unique_question_items: list[SaveQuestionItemContext] = []
+        for question_item in question_items:
+            target_key = (question_item.candidate_id, question_item.position_id)
+            seen_question_keys = existing_question_keys_by_target.setdefault(target_key, set())
+            question_key = (
+                question_item.question_type,
+                question_item.question_text.strip(),
+            )
             if question_key in seen_question_keys:
                 continue
-            seen_question_keys.add(question_key)
-            question_items.append((question.question_text, question_type, question.evaluation_intent, question.generation_basis))
-        return question_items
 
-    def _get_default_save_question_type(self, data: QuestionSaveRequest, resolved_position_id: int | None) -> str:
-        if data.candidate_id is not None:
-            if resolved_position_id is not None:
+            seen_question_keys.add(question_key)
+            unique_question_items.append(question_item)
+
+        return unique_question_items
+
+    def _get_default_save_question_type(
+        self,
+        candidate_id: int | None,
+        position_id: int | None,
+    ) -> str:
+        if candidate_id is not None:
+            if position_id is not None:
                 return CANDIDATE_JOB_FIT_BASED_QUESTION_TYPE
             return CANDIDATE_RESUME_BASED_QUESTION_TYPE
         return POSITION_BASED_QUESTION_TYPE
@@ -237,43 +339,85 @@ class QuestionService:
     async def _validate_generation_job_questions(
         self,
         db: AsyncSession,
-        data: QuestionSaveRequest,
-        question_items: list[tuple[str, str, str | None, str | None]],
-        resolved_position_id: int | None,
+        question_items: list[SaveQuestionItemContext],
+        request_generation_job_id: int | None,
         created_by_user_id: int | None,
         created_by_interviewer_id: int | None,
     ) -> None:
-        if data.generation_job_id is None:
-            return
+        job_cache: dict[int, QuestionGenerationJob] = {}
+        generated_question_keys_cache: dict[int, set[tuple[str, str]]] = {}
 
-        job = await question_generation_job_repository.find_by_id(
-            db,
-            data.generation_job_id,
-        )
-        if not job:
-            raise NotFoundException("질문 생성 작업을 찾을 수 없습니다.")
+        for question_item in question_items:
+            generation_job_id = (
+                question_item.generation_job_id
+                if question_item.generation_job_id is not None
+                else request_generation_job_id
+            )
+            if generation_job_id is None:
+                continue
 
-        self._validate_generation_job_owner(
-            job=job,
-            created_by_user_id=created_by_user_id,
-            created_by_interviewer_id=created_by_interviewer_id,
-        )
+            job = job_cache.get(generation_job_id)
+            if job is None:
+                job = await question_generation_job_repository.find_by_id(
+                    db,
+                    generation_job_id,
+                )
+                if not job:
+                    raise NotFoundException("질문 생성 작업을 찾을 수 없습니다.")
 
-        if job.status != QUESTION_GENERATION_STATUS_SUCCEEDED:
-            raise ConflictException("완료된 질문 생성 작업만 저장할 수 있습니다.")
+                self._validate_generation_job_owner(
+                    job=job,
+                    created_by_user_id=created_by_user_id,
+                    created_by_interviewer_id=created_by_interviewer_id,
+                )
 
-        if job.candidate_id != data.candidate_id:
-            raise ConflictException("질문 생성 작업의 지원자 정보가 일치하지 않습니다.")
+                if job.status != QUESTION_GENERATION_STATUS_SUCCEEDED:
+                    raise ConflictException("완료된 질문 생성 작업만 저장할 수 있습니다.")
 
-        if job.position_id is not None and job.position_id != resolved_position_id:
-            raise ConflictException("질문 생성 작업의 직무 정보가 일치하지 않습니다.")
+                job_cache[generation_job_id] = job
+                generated_question_keys_cache[generation_job_id] = self._get_generated_question_keys(job)
 
-        generated_question_keys = self._get_generated_question_keys(job)
-        for question_text, question_type, _, _ in question_items:
-            if (question_type, question_text) not in generated_question_keys:
+            if job.candidate_id != question_item.candidate_id:
+                raise ConflictException("질문 생성 작업의 지원자 정보가 일치하지 않습니다.")
+
+            if job.position_id is not None and job.position_id != question_item.position_id:
+                raise ConflictException("질문 생성 작업의 직무 정보가 일치하지 않습니다.")
+
+            generated_question_keys = generated_question_keys_cache[generation_job_id]
+            if (
+                question_item.question_type,
+                question_item.question_text.strip(),
+            ) not in generated_question_keys:
                 raise ConflictException(
                     "선택한 질문이 해당 생성 작업의 결과에 포함되어 있지 않습니다."
                 )
+
+    def _resolve_item_candidate_id(
+        self,
+        data: QuestionSaveRequest,
+        question: QuestionSaveItem,
+    ) -> int | None:
+        if question.candidate_id is not None:
+            return question.candidate_id
+        return data.candidate_id
+
+    def _resolve_item_position_id(
+        self,
+        data: QuestionSaveRequest,
+        question: QuestionSaveItem,
+    ) -> int | None:
+        if question.position_id is not None:
+            return question.position_id
+        return data.position_id
+
+    def _resolve_item_generation_job_id(
+        self,
+        data: QuestionSaveRequest,
+        question: QuestionSaveItem,
+    ) -> int | None:
+        if question.generation_job_id is not None:
+            return question.generation_job_id
+        return data.generation_job_id
 
     def _validate_generation_job_owner(
         self,

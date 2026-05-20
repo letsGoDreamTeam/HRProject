@@ -1,6 +1,7 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { useQuestionGenerationJob } from "@/components/hr/question-generation/QuestionGenerationJobProvider";
 import ControlPanel from "./ControlPanel";
@@ -22,6 +23,7 @@ export default function AgentClient({
   initialPositions,
   initialCandidates,
 }: AgentClientProps) {
+  const queryClient = useQueryClient();
   const [selectedPositionId, setSelectedPositionId] = useState<number | null>(
     null,
   );
@@ -37,6 +39,24 @@ export default function AgentClient({
     isCreating,
     isJobActive,
   } = useQuestionGenerationJob();
+  const candidateNameById = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const candidate of initialCandidates) {
+      if (candidate.name?.trim()) {
+        map[candidate.candidate_id] = candidate.name.trim();
+      }
+    }
+    return map;
+  }, [initialCandidates]);
+  const positionNameById = useMemo(() => {
+    const map: Record<number, string> = {};
+    for (const position of initialPositions) {
+      if (position.positionName?.trim()) {
+        map[position.positionId] = position.positionName.trim();
+      }
+    }
+    return map;
+  }, [initialPositions]);
 
   const handleGenerate = useCallback(
     async (additionalRequest?: string) => {
@@ -100,17 +120,28 @@ export default function AgentClient({
     setIsSaving(true);
     try {
       const payload: QuestionSavePayload = {
-        positionId: selectedPositionId || undefined,
-        candidateId: selectedCandidateId || undefined,
         questions: selectedQuestions.map((q) => ({
           questionText: q.questionText,
           questionType: q.questionType,
           evaluationIntent: q.evaluationIntent,
           generationBasis: q.generationBasis,
+          candidateId: q.sourceCandidateId,
+          positionId: q.sourcePositionId ?? undefined,
+          generationJobId: q.sourceJobId,
         })),
       };
 
       const result = await questionAPI.saveQuestions(payload);
+
+      await Promise.all([
+        queryClient.invalidateQueries({
+          queryKey: ["hr-questions-counts"],
+        }),
+        queryClient.invalidateQueries({
+          queryKey: ["hr-questions-by-position"],
+        }),
+      ]);
+
       toast.success(result.message ?? "저장이 완료되었습니다.");
     } catch (error) {
       toast.error(getApiErrorMessage(error, "저장에 실패했습니다."));
@@ -146,6 +177,8 @@ export default function AgentClient({
         onToggleQuestionSelect={toggleQuestionSelection}
         onToggleSelectAll={toggleSelectAllQuestions}
         onClearSelection={clearQuestionSelection}
+        candidateNameById={candidateNameById}
+        positionNameById={positionNameById}
       />
     </div>
   );

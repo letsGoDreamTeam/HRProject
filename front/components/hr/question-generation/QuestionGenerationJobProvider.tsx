@@ -36,12 +36,16 @@ const JOB_QUERY_KEY = "questionGenerationJob";
 type SuccessListener = (questions: UIGeneratedQuestion[]) => void;
 
 function mapToUiQuestions(
-  items: QuestionGenerationJobResponse["resultQuestions"],
+  job: QuestionGenerationJobResponse,
 ): UIGeneratedQuestion[] {
+  const items = job.resultQuestions;
   if (!items?.length) return [];
   return items.map((q, idx) => ({
     ...q,
-    id: `gen-q-${q.questionType}-${q.questionText.trim()}-${idx}`,
+    id: `gen-job-${job.jobId}-q-${q.questionType}-${q.questionText.trim()}-${idx}`,
+    sourceCandidateId: job.candidateId,
+    sourcePositionId: job.positionId,
+    sourceJobId: job.jobId,
   }));
 }
 
@@ -238,7 +242,7 @@ export function QuestionGenerationJobProvider({
     if (!job) return;
 
     if (job.status === "succeeded") {
-      const uiItems = mapToUiQuestions(job.resultQuestions);
+      const uiItems = mapToUiQuestions(job);
       setTimeout(() => {
         applySucceeded(uiItems);
         setJobId(null);

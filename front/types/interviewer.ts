@@ -23,6 +23,9 @@ export interface BackendGeneratedQuestion {
 
 export interface UIGeneratedQuestion extends BackendGeneratedQuestion {
   id: string;
+  sourceCandidateId: number;
+  sourcePositionId: number | null;
+  sourceJobId: number;
 }
 
 export interface QuestionGeneratePayload {
@@ -35,11 +38,15 @@ export interface QuestionGeneratePayload {
 export interface QuestionSavePayload {
   positionId?: number;
   candidateId?: number;
+  generationJobId?: number;
   questions: Array<{
     questionText: string;
     questionType?: string;
     evaluationIntent?: string;
     generationBasis?: string;
+    candidateId?: number;
+    positionId?: number;
+    generationJobId?: number;
   }>;
 }
 
