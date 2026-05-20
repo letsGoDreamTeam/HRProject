@@ -1,21 +1,21 @@
 import { Position, PositionPayload, PositionMutationResponse } from "@/types/position";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export const positionApi = {
   /** GET /api/positions */
   fetchPositions: async (): Promise<Position[]> => {
-    const response = await api.get<Position[]>("/api/positions");
+    const response = await hrApi.get<Position[]>("/api/positions");
     return response.data;
   },
 
   /**
-   * 직무 생성 (Create)
+   * 吏곷Т ?앹꽦 (Create)
    * POST /api/positions
    */
   createPosition: async (
     data: PositionPayload,
   ): Promise<PositionMutationResponse> => {
-    const response = await api.post<PositionMutationResponse>(
+    const response = await hrApi.post<PositionMutationResponse>(
       "/api/positions",
       data,
     );
@@ -23,14 +23,14 @@ export const positionApi = {
   },
 
   /**
-   * 직무 수정 (Update)
+   * 吏곷Т ?섏젙 (Update)
    * PATCH /api/positions/{positionId}
    */
   updatePosition: async (
     positionId: number,
     data: PositionPayload,
   ): Promise<PositionMutationResponse> => {
-    const response = await api.patch<PositionMutationResponse>(
+    const response = await hrApi.patch<PositionMutationResponse>(
       `/api/positions/${positionId}`,
       data,
     );
@@ -38,15 +38,16 @@ export const positionApi = {
   },
 
   /**
-   * 직무 삭제 (Delete)
+   * 吏곷Т ??젣 (Delete)
    * DELETE /api/positions/{positionId}
    */
   deletePosition: async (
     positionId: number,
   ): Promise<PositionMutationResponse> => {
-    const response = await api.delete<PositionMutationResponse>(
+    const response = await hrApi.delete<PositionMutationResponse>(
       `/api/positions/${positionId}`,
     );
     return response.data;
   },
 };
+

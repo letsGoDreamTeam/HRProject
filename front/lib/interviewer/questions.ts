@@ -7,7 +7,7 @@ import {
   QuestionGenerationJobResponse,
   QuestionSavePayload,
 } from "@/types/interviewer";
-import { api } from "../api";
+import { interviewerApi } from "../api";
 
 const QUESTION_JOB_POLL_INTERVAL_MS = 1500;
 const QUESTION_JOB_TIMEOUT_MS = 180_000;
@@ -22,8 +22,8 @@ async function waitForQuestionJob(
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < QUESTION_JOB_TIMEOUT_MS) {
-    const { data } = await api.get<QuestionGenerationJobResponse>(
-      `/api/questions/generation-jobs/${jobId}`,
+    const { data } = await interviewerApi.get<QuestionGenerationJobResponse>(
+      `/api/interviewer/questions/generation-jobs/${jobId}`,
     );
 
     if (TERMINAL_STATUSES.has(data.status)) {
@@ -38,20 +38,24 @@ async function waitForQuestionJob(
 
 export const question = {
   getPositions: async (): Promise<BackendPosition[]> => {
-    const { data } = await api.get<BackendPosition[]>("/api/positions");
+    const { data } = await interviewerApi.get<BackendPosition[]>(
+      "/api/interviewer/positions",
+    );
     return data;
   },
 
   getCandidates: async (): Promise<BackendCandidate[]> => {
-    const { data } = await api.get<BackendCandidate[]>("/api/candidates");
+    const { data } = await interviewerApi.get<BackendCandidate[]>(
+      "/api/interviewer/candidates",
+    );
     return data;
   },
 
   createGenerationJob: async (
     payload: QuestionGeneratePayload,
   ): Promise<QuestionGenerationJobCreateResponse> => {
-    const { data } = await api.post<QuestionGenerationJobCreateResponse>(
-      "/api/questions/generate",
+    const { data } = await interviewerApi.post<QuestionGenerationJobCreateResponse>(
+      "/api/interviewer/questions/generate",
       payload,
     );
     return data;
@@ -60,15 +64,15 @@ export const question = {
   getGenerationJob: async (
     jobId: number,
   ): Promise<QuestionGenerationJobResponse> => {
-    const { data } = await api.get<QuestionGenerationJobResponse>(
-      `/api/questions/generation-jobs/${jobId}`,
+    const { data } = await interviewerApi.get<QuestionGenerationJobResponse>(
+      `/api/interviewer/questions/generation-jobs/${jobId}`,
     );
     return data;
   },
 
   getActiveGenerationJob: async (): Promise<QuestionGenerationJobResponse | null> => {
-    const { data } = await api.get<QuestionGenerationJobResponse | null>(
-      "/api/questions/generation-jobs/active",
+    const { data } = await interviewerApi.get<QuestionGenerationJobResponse | null>(
+      "/api/interviewer/questions/generation-jobs/active",
     );
     return data;
   },
@@ -91,8 +95,8 @@ export const question = {
   saveQuestions: async (
     payload: QuestionSavePayload,
   ): Promise<{ message: string }> => {
-    const { data } = await api.post<{ message: string }>(
-      "/api/questions",
+    const { data } = await interviewerApi.post<{ message: string }>(
+      "/api/interviewer/questions",
       payload,
     );
     return data;

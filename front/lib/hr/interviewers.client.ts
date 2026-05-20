@@ -5,7 +5,7 @@ import {
   InterviewerMutationResponse,
   InterviewerPayload,
 } from "@/types/interviewer";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 const normalizeListResponse = (
   data: HrInterviewer[] | InterviewerListResponse,
@@ -27,7 +27,7 @@ export const interviewerApi = {
   fetchInterviewers: async (
     params: InterviewerListParams = {},
   ): Promise<InterviewerListResponse> => {
-    const response = await api.get<HrInterviewer[] | InterviewerListResponse>(
+    const response = await hrApi.get<HrInterviewer[] | InterviewerListResponse>(
       "/api/interviewers",
       {
         params: {
@@ -44,7 +44,7 @@ export const interviewerApi = {
   },
 
   createInterviewer: async (data: InterviewerPayload): Promise<HrInterviewer> => {
-    const response = await api.post<HrInterviewer>("/api/interviewers", data);
+    const response = await hrApi.post<HrInterviewer>("/api/interviewers", data);
     return response.data;
   },
 
@@ -52,7 +52,7 @@ export const interviewerApi = {
     interviewerId: number,
     data: Partial<InterviewerPayload>,
   ): Promise<HrInterviewer> => {
-    const response = await api.patch<HrInterviewer>(
+    const response = await hrApi.patch<HrInterviewer>(
       `/api/interviewers/${interviewerId}`,
       data,
     );
@@ -62,9 +62,10 @@ export const interviewerApi = {
   deleteInterviewer: async (
     interviewerId: number,
   ): Promise<InterviewerMutationResponse> => {
-    const response = await api.delete<InterviewerMutationResponse>(
+    const response = await hrApi.delete<InterviewerMutationResponse>(
       `/api/interviewers/${interviewerId}`,
     );
     return response.data;
   },
 };
+

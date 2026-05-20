@@ -103,7 +103,9 @@ export default function InterviewerMailComposerModalBody({
                   : "초대 링크가 준비되었습니다"
             }
             description={
-              <span className="block break-all font-mono text-xs">{inviteUrl}</span>
+              <span className="block break-all font-mono text-xs">
+                {inviteUrl}
+              </span>
             }
             icon={mailSent ? "check-circle" : "link"}
             tone={mailSent ? "emerald" : "indigo"}
@@ -124,7 +126,9 @@ export default function InterviewerMailComposerModalBody({
               >
                 <i
                   className={`bx ${
-                    isApplyingTemplate ? "bx-loader-alt animate-spin" : "bx-brush"
+                    isApplyingTemplate
+                      ? "bx-loader-alt animate-spin"
+                      : "bx-brush"
                   } text-lg`}
                 />
                 템플릿 적용

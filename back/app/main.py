@@ -59,15 +59,14 @@ app.include_router(interviewer_mail_router)
 raw_cors_origins = os.getenv("CORS_ORIGINS", "").strip()
 if raw_cors_origins:
     allow_origins = [
-        origin.strip()
-        for origin in raw_cors_origins.split(",")
-        if origin.strip()
+        origin.strip() for origin in raw_cors_origins.split(",") if origin.strip()
     ]
 else:
     allow_origins = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
         "http://[::1]:3000",
+        "http://192.168.239.38:3000",
     ]
 
 app.add_middleware(
@@ -87,5 +86,3 @@ def root():
 @app.get("/health")
 async def health():
     return {"status": "ok"}
-
-

@@ -16,12 +16,16 @@ export default async function InterviewerPage() {
   const filteredCandidatesData =
     myPositionId == null
       ? candidatesData
-      : candidatesData.filter((candidate) => candidate.position_id === myPositionId);
+      : candidatesData.filter(
+          (candidate) => candidate.position_id === myPositionId,
+        );
 
   const filteredPositionsData =
     myPositionId == null
       ? positionsData
-      : positionsData.filter((position) => position.positionId === myPositionId);
+      : positionsData.filter(
+          (position) => position.positionId === myPositionId,
+        );
 
   return (
     <div className="animate-in fade-in duration-500 h-full flex flex-col">

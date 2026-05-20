@@ -70,9 +70,7 @@ export default function HrModal({
         onClick={(event) => event.stopPropagation()}
       >
         <header className="flex items-start justify-between gap-4 border-b border-slate-100 bg-slate-50/80 px-5 py-4 sm:px-6 sm:py-5">
-          <div
-            className="flex min-w-0 items-start gap-3"
-          >
+          <div className="flex min-w-0 items-start gap-3">
             {eyebrowIcon ? (
               <div
                 className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${styles.iconWrap}`}
@@ -114,7 +112,7 @@ export default function HrModal({
         <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
 
         {footer ? (
-          <footer className="border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6 sm:py-[18px]">
+          <footer className="border-t border-slate-100 bg-slate-50 px-5 py-4 sm:px-6 sm:py-4.5">
             {footer}
           </footer>
         ) : null}
@@ -122,4 +120,3 @@ export default function HrModal({
     </div>
   );
 }
-

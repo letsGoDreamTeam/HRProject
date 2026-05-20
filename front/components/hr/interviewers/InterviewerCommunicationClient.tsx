@@ -16,7 +16,10 @@ interface InterviewerCommunicationClientProps {
 
 const DEFAULT_INVITE_EXPIRES_DAYS = 7;
 
-function expiresInDaysFromIso(expiresAt: string, fallback = DEFAULT_INVITE_EXPIRES_DAYS) {
+function expiresInDaysFromIso(
+  expiresAt: string,
+  fallback = DEFAULT_INVITE_EXPIRES_DAYS,
+) {
   const ms = new Date(expiresAt).getTime() - Date.now();
   if (Number.isNaN(ms)) return fallback;
   return Math.min(30, Math.max(1, Math.ceil(ms / (1000 * 60 * 60 * 24))));
@@ -117,7 +120,9 @@ export default function InterviewerCommunicationClient({
                 value={positionId}
                 onChange={(event) =>
                   setPositionId(
-                    event.target.value === "ALL" ? "ALL" : Number(event.target.value),
+                    event.target.value === "ALL"
+                      ? "ALL"
+                      : Number(event.target.value),
                   )
                 }
                 className="w-full appearance-none rounded-2xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-10 text-sm font-semibold text-slate-800 outline-none transition focus:border-indigo-400 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
@@ -153,7 +158,7 @@ export default function InterviewerCommunicationClient({
       </section>
 
       <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_300px]">
-        <div className="rounded-[28px] border-2 border-slate-300/80 bg-white shadow-md ring-1 ring-slate-900/[0.03]">
+        <div className="rounded-[28px] border-2 border-slate-300/80 bg-white shadow-md ring-1 ring-slate-900/3">
           <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4 sm:px-6">
             <div>
               <p className="text-sm font-black text-slate-900">
@@ -180,7 +185,8 @@ export default function InterviewerCommunicationClient({
           ) : (
             <ul className="grid gap-3 p-4 sm:p-5">
               {filtered.map((interviewer) => {
-                const isOpening = openingMailForId === interviewer.interviewerId;
+                const isOpening =
+                  openingMailForId === interviewer.interviewerId;
 
                 return (
                   <li

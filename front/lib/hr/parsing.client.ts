@@ -1,11 +1,11 @@
-﻿import type {
+import type {
   ParseJobCreateResponse,
   ParseJobResponse,
   ParsingItem,
   ParsingResponse,
   ResumeParseJobStatus,
 } from "@/types/parsing";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 const PARSE_REQUEST_TIMEOUT_MS = 120_000;
 
@@ -82,7 +82,7 @@ export async function createParseJob(
     formData.append("files", file);
   }
 
-  const { data } = await api.post<RawJobPayload>("/api/parse/jobs", formData, {
+  const { data } = await hrApi.post<RawJobPayload>("/api/parse/jobs", formData, {
     timeout: PARSE_REQUEST_TIMEOUT_MS,
   });
   const normalized = normalizeJobPayload(data);
@@ -95,7 +95,7 @@ export async function createParseJob(
 }
 
 export async function getParseJob(jobId: string): Promise<ParseJobResponse> {
-  const { data } = await api.get<RawJobPayload>(`/api/parse/jobs/${jobId}`, {
+  const { data } = await hrApi.get<RawJobPayload>(`/api/parse/jobs/${jobId}`, {
     timeout: PARSE_REQUEST_TIMEOUT_MS,
   });
   return normalizeJobResponse(data);
@@ -120,7 +120,7 @@ type RawCancelPayload = {
 export async function cancelParseJob(
   jobId: string,
 ): Promise<CancelParseJobResponse> {
-  const { data } = await api.post<RawCancelPayload>(
+  const { data } = await hrApi.post<RawCancelPayload>(
     `/api/parse/jobs/${jobId}/cancel`,
     null,
     { timeout: PARSE_REQUEST_TIMEOUT_MS },
@@ -178,3 +178,4 @@ export function summarizeParseErrors(
   const rest = errors.length > maxItems ? ` 외 ${errors.length - maxItems}건` : "";
   return head + rest;
 }
+

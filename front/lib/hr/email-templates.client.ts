@@ -6,16 +6,16 @@ import {
   EmailTemplateRenderResponse,
   EmailTemplateUpdatePayload,
 } from "@/types/emailTemplate";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export const emailTemplateApi = {
   fetchEmailTemplates: async (): Promise<EmailTemplate[]> => {
-    const response = await api.get<EmailTemplate[]>("/api/email-templates");
+    const response = await hrApi.get<EmailTemplate[]>("/api/email-templates");
     return response.data;
   },
 
   fetchEmailTemplate: async (templateId: number): Promise<EmailTemplate> => {
-    const response = await api.get<EmailTemplate>(
+    const response = await hrApi.get<EmailTemplate>(
       `/api/email-templates/${templateId}`,
     );
     return response.data;
@@ -24,7 +24,7 @@ export const emailTemplateApi = {
   createEmailTemplate: async (
     data: EmailTemplateCreatePayload,
   ): Promise<EmailTemplate> => {
-    const response = await api.post<EmailTemplate>("/api/email-templates", data);
+    const response = await hrApi.post<EmailTemplate>("/api/email-templates", data);
     return response.data;
   },
 
@@ -32,7 +32,7 @@ export const emailTemplateApi = {
     templateId: number,
     data: EmailTemplateUpdatePayload,
   ): Promise<EmailTemplate> => {
-    const response = await api.patch<EmailTemplate>(
+    const response = await hrApi.patch<EmailTemplate>(
       `/api/email-templates/${templateId}`,
       data,
     );
@@ -42,7 +42,7 @@ export const emailTemplateApi = {
   deleteEmailTemplate: async (
     templateId: number,
   ): Promise<EmailTemplateMutationResponse> => {
-    const response = await api.delete<EmailTemplateMutationResponse>(
+    const response = await hrApi.delete<EmailTemplateMutationResponse>(
       `/api/email-templates/${templateId}`,
     );
     return response.data;
@@ -52,7 +52,7 @@ export const emailTemplateApi = {
     templateId: number,
     data: EmailTemplateRenderPayload,
   ): Promise<EmailTemplateRenderResponse> => {
-    const response = await api.post<EmailTemplateRenderResponse>(
+    const response = await hrApi.post<EmailTemplateRenderResponse>(
       `/api/email-templates/${templateId}/render`,
       {
         variables: data.variables ?? {},
@@ -61,3 +61,4 @@ export const emailTemplateApi = {
     return response.data;
   },
 };
+

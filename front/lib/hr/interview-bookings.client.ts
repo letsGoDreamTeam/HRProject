@@ -6,13 +6,13 @@ import {
   InterviewBookingPayload,
   InterviewBookingResponse,
 } from "@/types/interviewBooking";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export const interviewBookingApi = {
   fetchAvailableSlots: async (
     candidateId: number,
   ): Promise<AvailableInterviewSlot[]> => {
-    const response = await api.get<AvailableInterviewSlot[]>(
+    const response = await hrApi.get<AvailableInterviewSlot[]>(
       "/api/interview-bookings/available-slots",
       {
         params: { candidateId },
@@ -25,7 +25,7 @@ export const interviewBookingApi = {
   createBooking: async (
     payload: InterviewBookingPayload,
   ): Promise<InterviewBookingResponse> => {
-    const response = await api.post<InterviewBookingResponse>(
+    const response = await hrApi.post<InterviewBookingResponse>(
       "/api/interview-bookings",
       payload,
     );
@@ -37,7 +37,7 @@ export const interviewBookingApi = {
     bookingId: number,
     payload: InterviewBookingCancelPayload,
   ): Promise<InterviewBookingMutationResponse> => {
-    const response = await api.patch<InterviewBookingMutationResponse>(
+    const response = await hrApi.patch<InterviewBookingMutationResponse>(
       `/api/interview-bookings/${bookingId}/cancel`,
       payload,
     );
@@ -46,16 +46,17 @@ export const interviewBookingApi = {
   },
 
   /**
-   * 직무에 걸린 활성(미취소) booking 일괄 조회.
-   * 같은 직무 지원자 카드에서 "다른 슬롯에 배정됨" 라벨을 그리는 데 사용.
+   * 吏곷Т??嫄몃┛ ?쒖꽦(誘몄랬?? booking ?쇨큵 議고쉶.
+   * 媛숈? 吏곷Т 吏?먯옄 移대뱶?먯꽌 "?ㅻⅨ ?щ’??諛곗젙?? ?쇰꺼??洹몃━?????ъ슜.
    */
   fetchActiveBookingsByPosition: async (
     positionId: number,
   ): Promise<ActiveBookingSummary[]> => {
-    const response = await api.get<ActiveBookingSummary[]>(
+    const response = await hrApi.get<ActiveBookingSummary[]>(
       "/api/interview-bookings/active",
       { params: { positionId } },
     );
     return response.data;
   },
 };
+

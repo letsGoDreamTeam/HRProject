@@ -8,7 +8,7 @@ import {
   ApplicantMutationResponse,
   ApplicantUpdatePayload,
 } from "@/types/applicant";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export const assignInterviewers = async (
   data: AssignInterviewerRequest,
@@ -27,14 +27,14 @@ export const assignInterviewers = async (
 };
 
 export const fetchApplicants = async (): Promise<Applicant[]> => {
-  const response = await api.get<Applicant[]>("/api/candidates");
+  const response = await hrApi.get<Applicant[]>("/api/candidates");
   return response.data;
 };
 
 export const fetchApplicantDetail = async (
   candidateId: number,
 ): Promise<ApplicantDetail> => {
-  const response = await api.get<ApplicantDetail>(
+  const response = await hrApi.get<ApplicantDetail>(
     `/api/candidates/${candidateId}/detail`,
   );
   return response.data;
@@ -44,7 +44,7 @@ export const updateApplicant = async (
   candidateId: number,
   payload: ApplicantUpdatePayload,
 ): Promise<Applicant> => {
-  const response = await api.patch<Applicant>(
+  const response = await hrApi.patch<Applicant>(
     `/api/candidates/${candidateId}`,
     payload,
   );
@@ -54,8 +54,9 @@ export const updateApplicant = async (
 export const deleteApplicant = async (
   candidateId: number,
 ): Promise<ApplicantMutationResponse> => {
-  await api.delete(`/api/candidates/${candidateId}`);
+  await hrApi.delete(`/api/candidates/${candidateId}`);
   return {
-    message: "지원자가 삭제되었습니다.",
+    message: "吏?먯옄媛 ??젣?섏뿀?듬땲??",
   };
 };
+

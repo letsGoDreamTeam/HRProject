@@ -1,9 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { render } from "@react-email/render";
-import { createElement } from "react";
-import { Resend } from "resend";
+import nodemailer from "nodemailer";
 import { getBackendBaseUrl } from "@/app/server/http/fetch-backend";
-import InterviewerInviteEmail from "@/components/emails/InterviewerInviteEmail";
 
 type InterviewerInviteResponse = {
   inviteUrl?: string;
@@ -27,6 +24,19 @@ function getRequiredEnv(name: string): string {
     throw new Error(`${name} is required.`);
   }
   return value;
+}
+
+function parseSmtpSecure(value: string): boolean {
+  return value.toLowerCase() === "true";
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
 }
 
 function replaceInviteTokens(content: string, inviteUrl: string): string {
@@ -53,7 +63,9 @@ function getBearerFromAuthStorage(raw: string | undefined): string | null {
   } catch {
     try {
       const decoded = decodeURIComponent(raw);
-      const parsed = JSON.parse(decoded) as { state?: { token?: string | null } };
+      const parsed = JSON.parse(decoded) as {
+        state?: { token?: string | null };
+      };
       const token = parsed?.state?.token?.trim();
       return token ? `Bearer ${token}` : null;
     } catch {
@@ -137,7 +149,8 @@ export async function POST(
       );
     }
 
-    const inviteData = (await inviteResponse.json()) as InterviewerInviteResponse;
+    const inviteData =
+      (await inviteResponse.json()) as InterviewerInviteResponse;
     const inviteUrl = inviteData.inviteUrl ?? inviteData.invite_url ?? "";
     const expiresAt = inviteData.expiresAt ?? inviteData.expires_at ?? null;
 
@@ -148,37 +161,38 @@ export async function POST(
       );
     }
 
-    const resendApiKey = getRequiredEnv("RESEND_API_KEY");
-    const mailFrom = process.env.MAIL_FROM?.trim() ?? process.env.RESEND_FROM?.trim();
-    if (!mailFrom) {
-      throw new Error("MAIL_FROM or RESEND_FROM is required.");
+    const smtpHost = getRequiredEnv("SMTP_HOST");
+    const smtpPort = Number(getRequiredEnv("SMTP_PORT"));
+    const smtpSecure = parseSmtpSecure(getRequiredEnv("SMTP_SECURE"));
+    const smtpUser = getRequiredEnv("SMTP_USER");
+    const smtpPass = getRequiredEnv("SMTP_PASS");
+    const mailFrom = getRequiredEnv("MAIL_FROM");
+
+    if (!Number.isInteger(smtpPort) || smtpPort <= 0) {
+      throw new Error("SMTP_PORT must be a valid positive integer.");
     }
 
     const personalizedContent = replaceInviteTokens(content, inviteUrl);
-    const emailComponent = createElement(InterviewerInviteEmail, {
-      content: personalizedContent,
-      inviteUrl,
-      expiresAt,
-      previewText: buildPreviewText(subject, personalizedContent),
+    const text = personalizedContent;
+    const html = escapeHtml(personalizedContent).replaceAll("\n", "<br />");
+
+    const transporter = nodemailer.createTransport({
+      host: smtpHost,
+      port: smtpPort,
+      secure: smtpSecure,
+      auth: {
+        user: smtpUser,
+        pass: smtpPass,
+      },
     });
 
-    const [html, text] = await Promise.all([
-      render(emailComponent),
-      render(emailComponent, { plainText: true }),
-    ]);
-
-    const resend = new Resend(resendApiKey);
-    const emailResult = await resend.emails.send({
+    await transporter.sendMail({
       from: mailFrom,
       to: interviewerEmail,
       subject,
       html,
       text,
     });
-
-    if (emailResult.error) {
-      throw new Error(emailResult.error.message);
-    }
 
     return NextResponse.json({
       message: "Interviewer mail sent successfully.",
@@ -187,7 +201,9 @@ export async function POST(
     });
   } catch (error) {
     const message =
-      error instanceof Error ? error.message : "Failed to send interviewer mail.";
+      error instanceof Error
+        ? error.message
+        : "Failed to send interviewer mail.";
     return NextResponse.json({ message }, { status: 500 });
   }
 }

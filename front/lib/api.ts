@@ -1,4 +1,4 @@
-﻿import axios, { InternalAxiosRequestConfig } from "axios";
+import axios, { InternalAxiosRequestConfig } from "axios";
 import Cookies from "js-cookie";
 
 const isDev = process.env.NODE_ENV === "development";
@@ -17,16 +17,9 @@ if (!/^https?:\/\//i.test(rawApiBaseUrl)) {
 }
 
 const API_BASE_URL = rawApiBaseUrl.replace(/\/+$/, "");
+const BFF_BASE_URL = "";
 
 export const API_URL = `${API_BASE_URL}/api/knowledge/upload`;
-
-export const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 10000,
-  headers: {
-    "Content-Type": "application/json",
-  },
-});
 
 let cachedAuthStorageRaw: string | undefined;
 let cachedBearerToken: string | null = null;
@@ -57,23 +50,45 @@ function resolveBearerTokenFromCookie(): string | null {
   return cachedBearerToken;
 }
 
-api.interceptors.request.use(
-  (config: InternalAxiosRequestConfig) => {
-    if (config.data instanceof FormData) {
-      config.headers.delete("Content-Type");
-    }
+function createApiClient(baseURL: string) {
+  const client = axios.create({
+    baseURL,
+    timeout: 10000,
+    headers: {
+      "Content-Type": "application/json",
+    },
+  });
 
-    if (typeof window !== "undefined") {
-      try {
-        const token = resolveBearerTokenFromCookie();
-        if (token) {
-          config.headers.set("Authorization", `Bearer ${token}`);
-        }
-      } catch (error) {
-        console.error("쿠키 토큰 파싱 중 오류 발생:", error);
+  client.interceptors.request.use(
+    (config: InternalAxiosRequestConfig) => {
+      if (config.data instanceof FormData) {
+        config.headers.delete("Content-Type");
       }
-    }
-    return config;
-  },
-  (error) => Promise.reject(error),
-);
+
+      if (typeof window !== "undefined") {
+        try {
+          const token = resolveBearerTokenFromCookie();
+          if (token) {
+            config.headers.set("Authorization", `Bearer ${token}`);
+          }
+        } catch (error) {
+          console.error("쿠키 토큰 파싱 중 오류 발생:", error);
+        }
+      }
+
+      return config;
+    },
+    (error) => Promise.reject(error),
+  );
+
+  return client;
+}
+
+export const commonApi = createApiClient(BFF_BASE_URL);
+export const adminApi = createApiClient(BFF_BASE_URL);
+export const hrApi = createApiClient(BFF_BASE_URL);
+export const interviewerApi = createApiClient(BFF_BASE_URL);
+export const intervieweeApi = createApiClient(BFF_BASE_URL);
+
+// Backward compatibility for existing modules.
+export const api = commonApi;

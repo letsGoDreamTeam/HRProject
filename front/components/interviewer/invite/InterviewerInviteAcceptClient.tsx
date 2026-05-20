@@ -7,6 +7,7 @@ import { toast } from "sonner";
 import useAuthStore from "@/lib/stores/auth";
 import { getApiErrorMessage } from "@/lib/hr/api-error";
 import { interviewerInviteApi } from "@/lib/hr/interviewer-invites.client";
+import { question } from "@/lib/interviewer/questions";
 import InviteAcceptResultCard from "./InviteAcceptResultCard";
 
 interface InterviewerInviteAcceptClientProps {
@@ -54,6 +55,7 @@ export default function InterviewerInviteAcceptClient({
     "초대 링크를 확인한 뒤 수락하면 인터뷰어 전용 화면으로 이동할 수 있습니다.",
   );
   const [interviewerName, setInterviewerName] = useState<string | undefined>();
+  const [isCheckingAuth, setIsCheckingAuth] = useState(false);
 
   const token = useMemo(
     () => initialToken || searchParams.get("token") || "",
@@ -70,6 +72,9 @@ export default function InterviewerInviteAcceptClient({
     setStatus("loading");
     try {
       const response = await interviewerInviteApi.acceptInvite({ token });
+      if (!response.accessToken) {
+        throw new Error("초대 수락 응답에 access token이 없습니다.");
+      }
       setAuth(response.interviewer.interviewerName, response.accessToken);
       setInterviewerName(response.interviewer.interviewerName);
       setStatus("success");
@@ -85,6 +90,18 @@ export default function InterviewerInviteAcceptClient({
           "초대 수락에 실패했습니다. 만료되었거나 이미 사용된 링크일 수 있습니다.",
         ),
       );
+    }
+  };
+
+  const handleCheckAuth = async () => {
+    setIsCheckingAuth(true);
+    try {
+      await question.getActiveGenerationJob();
+      toast.success("인증 확인 완료: 면접관 토큰이 유효합니다.");
+    } catch (error) {
+      toast.error(getApiErrorMessage(error, "인증 확인에 실패했습니다."));
+    } finally {
+      setIsCheckingAuth(false);
     }
   };
 
@@ -170,14 +187,31 @@ export default function InterviewerInviteAcceptClient({
             ))}
           </div>
           <div className="flex justify-center pt-2">
-            <button
-              type="button"
-              onClick={() => router.push("/interviewer")}
-              className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-indigo-700"
-            >
-              <i className="bx bx-right-arrow-alt text-lg" />
-              바로 이동
-            </button>
+            <div className="flex flex-wrap items-center justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCheckAuth()}
+                disabled={isCheckingAuth}
+                className="inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-white px-4 py-2.5 text-sm font-black text-indigo-700 transition hover:bg-indigo-50 disabled:opacity-60"
+              >
+                <i
+                  className={`bx ${
+                    isCheckingAuth
+                      ? "bx-loader-alt animate-spin"
+                      : "bx-shield-quarter"
+                  } text-lg`}
+                />
+                인증 확인
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push("/interviewer")}
+                className="inline-flex items-center gap-2 rounded-2xl bg-indigo-600 px-4 py-2.5 text-sm font-black text-white transition hover:bg-indigo-700"
+              >
+                <i className="bx bx-right-arrow-alt text-lg" />
+                바로 이동
+              </button>
+            </div>
           </div>
         </section>
       ) : null}

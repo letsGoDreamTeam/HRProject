@@ -1,4 +1,4 @@
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export type CandidateMailVariableValue = string | number | boolean | null;
 
@@ -21,7 +21,7 @@ export const candidateMailApi = {
     candidateId: number,
     payload: CandidateMailPayload,
   ): Promise<CandidateMailResponse> => {
-    const response = await api.post<
+    const response = await hrApi.post<
       CandidateMailResponse & {
         invitation_url?: string;
         expires_at?: string;
@@ -39,3 +39,4 @@ export const candidateMailApi = {
     };
   },
 };
+

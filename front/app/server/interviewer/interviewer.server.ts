@@ -99,7 +99,9 @@ export const fetchCandidates = async (): Promise<BackendCandidate[]> => {
   }
 };
 
-export const fetchMyInterviewerPositionId = async (): Promise<number | null> => {
+export const fetchMyInterviewerPositionId = async (): Promise<
+  number | null
+> => {
   try {
     const me = await getAuthMeServer();
     const email = me.userEmail?.trim().toLowerCase();

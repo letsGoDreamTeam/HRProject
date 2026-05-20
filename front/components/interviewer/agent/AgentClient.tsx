@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { usePathname } from "next/navigation";
 import { toast } from "sonner";
 import { useQuestionGenerationJob } from "@/components/hr/question-generation/QuestionGenerationJobProvider";
 import ControlPanel from "./ControlPanel";
@@ -12,7 +13,8 @@ import {
   QuestionSavePayload,
 } from "@/types/interviewer";
 import { getApiErrorMessage } from "@/lib/hr/api-error";
-import { question as questionAPI } from "@/lib/interviewer/questions";
+import { hrQuestionGenerationApi } from "@/lib/hr/questions.client";
+import { question as interviewerQuestionApi } from "@/lib/interviewer/questions";
 
 interface AgentClientProps {
   initialPositions: BackendPosition[];
@@ -23,6 +25,11 @@ export default function AgentClient({
   initialPositions,
   initialCandidates,
 }: AgentClientProps) {
+  const pathname = usePathname();
+  const isInterviewerPath = pathname?.startsWith("/interviewer") === true;
+  const questionAPI = isInterviewerPath
+    ? interviewerQuestionApi
+    : hrQuestionGenerationApi;
   const queryClient = useQueryClient();
   const [selectedPositionId, setSelectedPositionId] = useState<number | null>(
     null,

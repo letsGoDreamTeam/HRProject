@@ -8,7 +8,7 @@ import {
   AvailableInterviewSlot,
   InterviewBookingResponse,
 } from "@/types/interviewBooking";
-import { api } from "../api";
+import { intervieweeApi } from "../api";
 
 export const interviewBookingInvitationApi = {
   /**
@@ -18,7 +18,7 @@ export const interviewBookingInvitationApi = {
   createInvitation: async (
     payload: InterviewBookingInvitationCreatePayload,
   ): Promise<InterviewBookingInvitationCreateResponse> => {
-    const response = await api.post<InterviewBookingInvitationCreateResponse>(
+    const response = await intervieweeApi.post<InterviewBookingInvitationCreateResponse>(
       "/api/interview-booking-invitations",
       payload,
     );
@@ -28,7 +28,7 @@ export const interviewBookingInvitationApi = {
   fetchAvailableSlotsByToken: async (
     token: string,
   ): Promise<AvailableInterviewSlot[]> => {
-    const response = await api.get<AvailableInterviewSlot[]>(
+    const response = await intervieweeApi.get<AvailableInterviewSlot[]>(
       `/api/interview-booking-invitations/${token}/available-slots`,
     );
     return response.data;
@@ -38,7 +38,7 @@ export const interviewBookingInvitationApi = {
     token: string,
     payload: InterviewBookingInvitationTokenBookingPayload,
   ): Promise<InterviewBookingResponse> => {
-    const response = await api.post<InterviewBookingResponse>(
+    const response = await intervieweeApi.post<InterviewBookingResponse>(
       `/api/interview-booking-invitations/${token}/bookings`,
       payload,
     );
@@ -48,7 +48,7 @@ export const interviewBookingInvitationApi = {
   revokeInvitation: async (
     invitationId: number,
   ): Promise<InterviewBookingInvitationMutationResponse> => {
-    const response = await api.patch<InterviewBookingInvitationMutationResponse>(
+    const response = await intervieweeApi.patch<InterviewBookingInvitationMutationResponse>(
       `/api/interview-booking-invitations/${invitationId}/revoke`,
     );
     return response.data;

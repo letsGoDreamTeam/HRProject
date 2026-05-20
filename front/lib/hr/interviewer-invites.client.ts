@@ -1,12 +1,12 @@
 import axios from "axios";
 import {
+  InterviewerAvailabilityResponse,
   InterviewerInviteAcceptPayload,
   InterviewerInviteAcceptResponse,
-  InterviewerAvailabilityResponse,
   InterviewerInvitePayload,
   InterviewerInviteResponse,
 } from "@/types/interviewer";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 function normalizeInviteResponse(
   data: InterviewerInviteResponse & {
@@ -27,12 +27,11 @@ function normalizeInviteResponse(
 }
 
 export const interviewerInviteApi = {
-  /** 만료·폐기되지 않은 활성 초대 링크 조회 (없으면 null) */
   getActiveInvite: async (
     interviewerId: number,
   ): Promise<InterviewerInviteResponse | null> => {
     try {
-      const response = await api.get<
+      const response = await hrApi.get<
         InterviewerInviteResponse & {
           invite_id?: number;
           invite_url?: string;
@@ -48,14 +47,10 @@ export const interviewerInviteApi = {
     }
   },
 
-  /**
-   * 활성 링크가 있으면 재사용, 없으면 새로 생성.
-   * 서버 POST `/api/interviewer-invites`가 idempotent(get_or_create)이므로 POST만 사용합니다.
-   */
   ensureInvite: async (
     payload: InterviewerInvitePayload,
   ): Promise<InterviewerInviteResponse> => {
-    const response = await api.post<
+    const response = await hrApi.post<
       InterviewerInviteResponse & {
         invite_id?: number;
         interviewer_id?: number;
@@ -73,7 +68,7 @@ export const interviewerInviteApi = {
   createInvite: async (
     payload: InterviewerInvitePayload,
   ): Promise<InterviewerInviteResponse> => {
-    const response = await api.post<
+    const response = await hrApi.post<
       InterviewerInviteResponse & {
         invite_id?: number;
         invite_url?: string;
@@ -86,17 +81,25 @@ export const interviewerInviteApi = {
   acceptInvite: async (
     payload: InterviewerInviteAcceptPayload,
   ): Promise<InterviewerInviteAcceptResponse> => {
-    const response = await api.post<InterviewerInviteAcceptResponse>(
-      "/api/interviewer-invites/accept",
-      payload,
-    );
-    return response.data;
+    const response = await hrApi.post<
+      InterviewerInviteAcceptResponse & {
+        access_token?: string;
+        token_type?: string;
+      }
+    >("/api/interviewer-invites/accept", payload);
+
+    const data = response.data;
+    return {
+      accessToken: data.accessToken ?? data.access_token ?? "",
+      tokenType: data.tokenType ?? data.token_type ?? "bearer",
+      interviewer: data.interviewer,
+    };
   },
 
   getAvailability: async (
     token: string,
   ): Promise<InterviewerAvailabilityResponse> => {
-    const response = await api.get<InterviewerAvailabilityResponse>(
+    const response = await hrApi.get<InterviewerAvailabilityResponse>(
       `/api/interviewer-invites/${token}/availability`,
     );
     return response.data;
@@ -106,10 +109,11 @@ export const interviewerInviteApi = {
     token: string,
     payload: { decision: "accepted" | "declined"; note?: string },
   ): Promise<InterviewerAvailabilityResponse> => {
-    const response = await api.post<InterviewerAvailabilityResponse>(
+    const response = await hrApi.post<InterviewerAvailabilityResponse>(
       `/api/interviewer-invites/${token}/availability`,
       payload,
     );
     return response.data;
   },
 };
+

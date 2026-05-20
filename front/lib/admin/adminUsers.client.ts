@@ -6,10 +6,10 @@ import {
   DeleteUserResponse,
   AdminUserListResponse,
 } from "@/types/admin";
-import { api } from "@/lib/api"; // 만들어두신 클라이언트용 axios (인터셉터 포함)
+import { adminApi } from "@/lib/api"; // 만들어두신 클라이언트용 axios (인터셉터 포함)
 
 export const createUser = async (data: CreateUserRequest): Promise<AdminUser> => {
-  const response = await api.post<AdminUser>("/api/admin/users", data);
+  const response = await adminApi.post<AdminUser>("/api/admin/users", data);
   return response.data;
 };
 
@@ -17,7 +17,7 @@ export const createUser = async (data: CreateUserRequest): Promise<AdminUser> =>
 export const getUserDetail = async (userId: number): Promise<AdminUser> => {
   try {
     // 1. 서버 통신 성공 시
-    const response = await api.get<AdminUser>(`/api/admin/users/${userId}`);
+    const response = await adminApi.get<AdminUser>(`/api/admin/users/${userId}`);
     return response.data;
   } catch (error) {
     // 2. 서버 통신 실패 시 (catch)
@@ -44,7 +44,7 @@ export const getUserDetail = async (userId: number): Promise<AdminUser> => {
 export const deleteUser = async (
   userId: number,
 ): Promise<DeleteUserResponse> => {
-  const response = await api.delete<DeleteUserResponse>(
+  const response = await adminApi.delete<DeleteUserResponse>(
     `/api/admin/users/${userId}`,
   );
   return response.data;
@@ -56,7 +56,7 @@ export const fetchAdminUsersClient = async (
   keyword: string = ""
 ): Promise<AdminUserListResponse> => {
   try {
-    const response = await api.get<AdminUserListResponse>('/api/admin/users', {
+    const response = await adminApi.get<AdminUserListResponse>('/api/admin/users', {
       params: { page, size, keyword },
     });
     return response.data;

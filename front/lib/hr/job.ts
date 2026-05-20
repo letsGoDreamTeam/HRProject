@@ -1,51 +1,51 @@
 import { CreatePositionRequest, CreatePositionResponse, DeletePositionResponse, Position, UpdatePositionRequest, UpdatePositionResponse } from "@/types/hr";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 /**
- * @description 새로운 채용 직무 생성 API
+ * @description ?덈줈??梨꾩슜 吏곷Т ?앹꽦 API
  * URL: /api/positions
  * Method: POST
- * Headers: api 인스턴스의 인터셉터가 토큰을 자동 주입합니다.
+ * Headers: api ?몄뒪?댁뒪???명꽣?됲꽣媛 ?좏겙???먮룞 二쇱엯?⑸땲??
  */
 export const createPosition = async (
     positionData: CreatePositionRequest
 ): Promise<CreatePositionResponse> => {
     try {
-        // HTTP POST 메서드를 사용하여 데이터를 전송합니다.
-        const response = await api.post<CreatePositionResponse>(
+        // HTTP POST 硫붿꽌?쒕? ?ъ슜?섏뿬 ?곗씠?곕? ?꾩넚?⑸땲??
+        const response = await hrApi.post<CreatePositionResponse>(
             '/api/positions',
             positionData
         );
         return response.data;
     } catch (error: any | Error) {
-        console.error("🚨 [POST] 직무 생성 실패! 목업 데이터를 반환합니다:", error);
+        console.error("?슚 [POST] 吏곷Т ?앹꽦 ?ㅽ뙣! 紐⑹뾽 ?곗씠?곕? 諛섑솚?⑸땲??", error);
 
-        // 서버 다운 시 프론트엔드 UI 테스트용 가짜 응답 (Fallback)
+        // ?쒕쾭 ?ㅼ슫 ???꾨줎?몄뿏??UI ?뚯뒪?몄슜 媛吏??묐떟 (Fallback)
         return {
-            message: "직무 생성이 완료되었습니다. (UI 테스트용 가짜 응답)",
+            message: "吏곷Т ?앹꽦???꾨즺?섏뿀?듬땲?? (UI ?뚯뒪?몄슜 媛吏??묐떟)",
         };
     }
 };
 
 /**
- * [클라이언트 전용] 직무 목록 조회 API
- * 용도: 'use client'가 선언된 컴포넌트(모달, 드롭다운, 버튼 이벤트 등)에서 호출
+ * [?대씪?댁뼵???꾩슜] 吏곷Т 紐⑸줉 議고쉶 API
+ * ?⑸룄: 'use client'媛 ?좎뼵??而댄룷?뚰듃(紐⑤떖, ?쒕∼?ㅼ슫, 踰꾪듉 ?대깽?????먯꽌 ?몄텧
  * URL: /api/positions
  * Method: GET
  */
 export const getPositionsClient = async (): Promise<Position[]> => {
     try {
-        // 클라이언트 인터셉터가 자동으로 쿠키에서 토큰을 추출해 주입합니다.
-        const response = await api.get<Position[]>('/api/positions');
+        // ?대씪?댁뼵???명꽣?됲꽣媛 ?먮룞?쇰줈 荑좏궎?먯꽌 ?좏겙??異붿텧??二쇱엯?⑸땲??
+        const response = await hrApi.get<Position[]>('/api/positions');
         return response.data;
     } catch (error) {
-        console.error("🚨 [GET] 직무 목록 조회 실패 (클라이언트):", error);
+        console.error("?슚 [GET] 吏곷Т 紐⑸줉 議고쉶 ?ㅽ뙣 (?대씪?댁뼵??:", error);
         throw error;
     }
 };
 
 /**
- * @description 직무 수정 API
+ * @description 吏곷Т ?섏젙 API
  * Method: PATCH
  * URL: /api/positions/{positionId}
  * Params: positionId (Path Variable)
@@ -56,47 +56,47 @@ export const updatePosition = async (
     data: UpdatePositionRequest
 ): Promise<UpdatePositionResponse> => {
     try {
-        // 💡 PATCH 메서드를 사용하여 특정 직무의 이름을 업데이트합니다.
-        const response = await api.patch<UpdatePositionResponse>(
+        // ?뮕 PATCH 硫붿꽌?쒕? ?ъ슜?섏뿬 ?뱀젙 吏곷Т???대쫫???낅뜲?댄듃?⑸땲??
+        const response = await hrApi.patch<UpdatePositionResponse>(
             `/api/positions/${positionId}`,
             data
         );
         return response.data;
     } catch (error: any) {
-        console.error(`🚨 [PATCH] 직무 수정 실패 (ID: ${positionId})! 목업 데이터를 반환합니다.`);
+        console.error(`?슚 [PATCH] 吏곷Т ?섏젙 ?ㅽ뙣 (ID: ${positionId})! 紐⑹뾽 ?곗씠?곕? 諛섑솚?⑸땲??`);
 
-        // 서버 통신 실패 시 UI 흐름을 유지하기 위한 가짜 응답 (Fallback)
+        // ?쒕쾭 ?듭떊 ?ㅽ뙣 ??UI ?먮쫫???좎??섍린 ?꾪븳 媛吏??묐떟 (Fallback)
         return {
-            message: "직무 수정이 완료되었습니다. (UI 테스트용 가짜 응답)",
+            message: "吏곷Т ?섏젙???꾨즺?섏뿀?듬땲?? (UI ?뚯뒪?몄슜 媛吏??묐떟)",
         };
     }
 };
 
 /**
- * @description 직무 삭제 API
+ * @description 吏곷Т ??젣 API
  * Method: DELETE
  * URL: /api/positions/{positionId}
- * Headers: api 인스턴스의 인터셉터가 auth-storage 쿠키에서 토큰을 자동 주입합니다.
+ * Headers: api ?몄뒪?댁뒪???명꽣?됲꽣媛 auth-storage 荑좏궎?먯꽌 ?좏겙???먮룞 二쇱엯?⑸땲??
  */
 export const deletePosition = async (
     positionId: number | string
 ): Promise<DeletePositionResponse> => {
     try {
-        // 💡 인터셉터가 쿠키에서 토큰을 꺼내 Authorization 헤더를 자동으로 채워줍니다.
-        const response = await api.delete<DeletePositionResponse>(
+        // ?뮕 ?명꽣?됲꽣媛 荑좏궎?먯꽌 ?좏겙??爰쇰궡 Authorization ?ㅻ뜑瑜??먮룞?쇰줈 梨꾩썙以띾땲??
+        const response = await hrApi.delete<DeletePositionResponse>(
             `/api/positions/${positionId}`
         );
 
         return response.data;
     } catch (error: any) {
-        // 🚨 백엔드 서버가 꺼져있거나 연결이 안 될 경우를 위한 목업 처리
+        // ?슚 諛깆뿏???쒕쾭媛 爰쇱졇?덇굅???곌껐??????寃쎌슦瑜??꾪븳 紐⑹뾽 泥섎━
         console.error(
-            `🚨 [DELETE] 직무 삭제 실패 (ID: ${positionId})! 테스트용 데이터를 반환합니다.`
+            `?슚 [DELETE] 吏곷Т ??젣 ?ㅽ뙣 (ID: ${positionId})! ?뚯뒪?몄슜 ?곗씠?곕? 諛섑솚?⑸땲??`
         );
 
-        // 성공한 것처럼 응답을 보내 UI 흐름을 유지합니다.
+        // ?깃났??寃껋쿂???묐떟??蹂대궡 UI ?먮쫫???좎??⑸땲??
         return {
-            message: "직무 삭제가 완료되었습니다 (UI 테스트용 가짜 응답)",
+            message: "吏곷Т ??젣媛 ?꾨즺?섏뿀?듬땲??(UI ?뚯뒪?몄슜 媛吏??묐떟)",
         };
     }
 };

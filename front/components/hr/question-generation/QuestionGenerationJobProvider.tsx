@@ -24,7 +24,8 @@ import {
   QUESTION_GENERATION_TOAST_ID,
   questionGenerationPercent,
 } from "@/lib/hr/question-generation.constants";
-import { question } from "@/lib/interviewer/questions";
+import { hrQuestionGenerationApi } from "@/lib/hr/questions.client";
+import { question as interviewerQuestionApi } from "@/lib/interviewer/questions";
 import type {
   QuestionGeneratePayload,
   QuestionGenerationJobResponse,
@@ -160,6 +161,13 @@ export function QuestionGenerationJobProvider({
   >([]);
   const [jobError, setJobError] = useState<string | null>(null);
   const [isToastMinimized, setIsToastMinimized] = useState(false);
+  const [showCompletedToast, setShowCompletedToast] = useState(false);
+  const [completedToastProgress, setCompletedToastProgress] =
+    useState<QuestionGenerationToastProgress | null>(null);
+  const isInterviewerPath = pathname?.startsWith("/interviewer") === true;
+  const questionApi = isInterviewerPath
+    ? interviewerQuestionApi
+    : hrQuestionGenerationApi;
 
   const registerOnSucceeded = useCallback((listener: SuccessListener) => {
     listenersRef.current.add(listener);
@@ -191,7 +199,7 @@ export function QuestionGenerationJobProvider({
   );
 
   const createMutation = useMutation({
-    mutationFn: question.createGenerationJob,
+    mutationFn: questionApi.createGenerationJob,
     onSuccess: (data) => {
       setJobId(data.jobId);
       setJobError(null);
@@ -206,7 +214,7 @@ export function QuestionGenerationJobProvider({
 
   const jobQuery = useQuery({
     queryKey: [JOB_QUERY_KEY, jobId],
-    queryFn: () => question.getGenerationJob(jobId!),
+    queryFn: () => questionApi.getGenerationJob(jobId!),
     enabled: jobId != null,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
@@ -222,7 +230,7 @@ export function QuestionGenerationJobProvider({
 
     (async () => {
       try {
-        const active = await question.getActiveGenerationJob();
+        const active = await questionApi.getActiveGenerationJob();
         if (cancelled || !active) return;
         if (active.status === "queued" || active.status === "running") {
           setJobId(active.jobId);
@@ -235,7 +243,7 @@ export function QuestionGenerationJobProvider({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [questionApi]);
 
   useEffect(() => {
     const job = jobQuery.data;
@@ -243,13 +251,23 @@ export function QuestionGenerationJobProvider({
 
     if (job.status === "succeeded") {
       const uiItems = mapToUiQuestions(job);
+      setCompletedToastProgress({
+        status: "succeeded",
+        label: QUESTION_GENERATION_STATUS_LABEL.succeeded,
+        percent: 100,
+        resultCount: uiItems.length,
+      });
+      setShowCompletedToast(true);
+      setTimeout(() => {
+        setShowCompletedToast(false);
+        setCompletedToastProgress(null);
+      }, 3000);
+
       setTimeout(() => {
         applySucceeded(uiItems);
         setJobId(null);
         setIsToastMinimized(false);
       }, 0);
-
-      toast.dismiss(QUESTION_GENERATION_TOAST_ID);
       toast.success(
         uiItems.length > 0
           ? `면접 질문 ${uiItems.length}개가 생성되었습니다.`
@@ -288,6 +306,7 @@ export function QuestionGenerationJobProvider({
     () => toToastProgress(jobQuery.data),
     [jobQuery.data],
   );
+  const toastProgress = completedToastProgress ?? progress;
 
   const isJobActive =
     createMutation.isPending ||
@@ -296,7 +315,7 @@ export function QuestionGenerationJobProvider({
         jobQuery.data?.status === "running" ||
         jobQuery.isFetching));
   const shouldShowToast =
-    pathname?.startsWith("/hr/ai-gen") === true ||
+    pathname?.startsWith("/hr") === true ||
     pathname?.startsWith("/interviewer") === true;
 
   const startGeneration = useCallback(
@@ -340,9 +359,9 @@ export function QuestionGenerationJobProvider({
   return (
     <QuestionGenerationJobContext.Provider value={value}>
       <QuestionGenerationJobToastHost
-        isJobActive={isJobActive}
+        isJobActive={isJobActive || showCompletedToast}
         shouldShowToast={shouldShowToast}
-        progress={progress}
+        progress={toastProgress}
         isMinimized={isToastMinimized}
         onToggleMinimize={() => setIsToastMinimized((prev) => !prev)}
       />

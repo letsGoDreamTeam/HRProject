@@ -6,7 +6,7 @@ import {
   InterviewSlotMutationItem,
   InterviewSlotUpdatePayload,
 } from "@/types/interviewSlotWrite";
-import { api } from "../api";
+import { hrApi } from "../api";
 
 export const interviewSlotsApi = {
   fetchSlots: async (params: {
@@ -15,7 +15,7 @@ export const interviewSlotsApi = {
     day?: number;
     positionId?: number;
   }): Promise<InterviewSlotListItem[]> => {
-    const response = await api.get<InterviewSlotListItem[]>(
+    const response = await hrApi.get<InterviewSlotListItem[]>(
       "/api/interview-slots",
       { params },
     );
@@ -23,7 +23,7 @@ export const interviewSlotsApi = {
   },
 
   fetchSlotDetail: async (slotId: number): Promise<InterviewSlotDetailItem> => {
-    const response = await api.get<InterviewSlotDetailItem>(
+    const response = await hrApi.get<InterviewSlotDetailItem>(
       `/api/interview-slots/${slotId}`,
     );
     return response.data;
@@ -32,7 +32,7 @@ export const interviewSlotsApi = {
   createSlot: async (
     payload: InterviewSlotCreatePayload,
   ): Promise<InterviewSlotMutationItem> => {
-    const response = await api.post<InterviewSlotMutationItem>(
+    const response = await hrApi.post<InterviewSlotMutationItem>(
       "/api/interview-slots",
       payload,
     );
@@ -42,7 +42,7 @@ export const interviewSlotsApi = {
   createSlotsBatch: async (
     payload: InterviewSlotBatchPayload,
   ): Promise<InterviewSlotMutationItem[]> => {
-    const response = await api.post<InterviewSlotMutationItem[]>(
+    const response = await hrApi.post<InterviewSlotMutationItem[]>(
       "/api/interview-slots/batch",
       payload,
     );
@@ -53,7 +53,7 @@ export const interviewSlotsApi = {
     slotId: number,
     payload: InterviewSlotUpdatePayload,
   ): Promise<InterviewSlotMutationItem> => {
-    const response = await api.patch<InterviewSlotMutationItem>(
+    const response = await hrApi.patch<InterviewSlotMutationItem>(
       `/api/interview-slots/${slotId}`,
       payload,
     );
@@ -61,9 +61,10 @@ export const interviewSlotsApi = {
   },
 
   deleteSlot: async (slotId: number): Promise<{ message: string }> => {
-    const response = await api.delete<{ message: string }>(
+    const response = await hrApi.delete<{ message: string }>(
       `/api/interview-slots/${slotId}`,
     );
     return response.data;
   },
 };
+
