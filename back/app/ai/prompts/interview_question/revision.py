@@ -52,7 +52,6 @@ question_text, evaluation_intent, generation_basis 답변:
 question_text: "[질문 유형 내용] 질문 내용"
 evaluation_intent: "질문 유형: 질문 유형 내용 / 난이도: 하, 중, 중상, 상과 같은 난이도 / 질문의도: 질문의도에 대한 내용 / 평가포인트: 평가포인트에 대한 내용"
 generation_basis: "근거에 대한 내용"
-
 """.strip()
 
     return [

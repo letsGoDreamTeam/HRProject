@@ -3,6 +3,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.repositories.candidate_repository import candidate_repository
 from app.repositories.interview_booking_repository import interview_booking_repository
 from app.models.candidate import Candidate
+from app.models.interviewer import Interviewer
 from app.schemas.candidate import (
     CandidateBookingRead,
     CandidateDetailRead,
@@ -35,6 +36,19 @@ class CandidateService:
 
     async def get_candidates(self, db: AsyncSession) -> list[CandidateRead]:
         candidates = await candidate_repository.find_all(db)
+        return [self._to_candidate_read(candidate) for candidate in candidates]
+
+    async def get_candidates_for_interviewer(
+        self,
+        db: AsyncSession,
+        interviewer: Interviewer,
+    ) -> list[CandidateRead]:
+        if interviewer.position_id is None:
+            return []
+        candidates = await candidate_repository.find_all_by_position_id(
+            db,
+            interviewer.position_id,
+        )
         return [self._to_candidate_read(candidate) for candidate in candidates]
 
     async def get_candidate(

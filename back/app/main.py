@@ -30,6 +30,7 @@ from app.routers.interviewer_invite_router import router as interviewer_invite_r
 from app.routers.interviewer_question_router import (
     router as interviewer_question_router,
 )
+from app.routers.interviewer_portal_router import router as interviewer_portal_router
 
 
 app = FastAPI()
@@ -48,6 +49,7 @@ app.include_router(question_router)
 app.include_router(resume_parse_router)
 app.include_router(interviewer_router)
 app.include_router(interviewer_invite_router)
+app.include_router(interviewer_portal_router)
 app.include_router(interviewer_question_router)
 app.include_router(candidate_router)
 app.include_router(mail_router)

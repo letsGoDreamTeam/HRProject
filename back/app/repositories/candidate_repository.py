@@ -22,6 +22,19 @@ class CandidateRepository:
         )
         return result.all()
 
+    async def find_all_by_position_id(
+        self,
+        db: AsyncSession,
+        position_id: int,
+    ) -> list[Candidate]:
+        result = await db.scalars(
+            select(Candidate)
+            .where(Candidate.position_id == position_id)
+            .options(selectinload(Candidate.position))
+            .order_by(Candidate.candidate_id.desc())
+        )
+        return list(result.all())
+
     # 기존
     async def find_by_id(
         self,

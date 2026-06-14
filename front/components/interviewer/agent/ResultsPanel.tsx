@@ -13,6 +13,8 @@ interface ResultsPanelProps {
   onToggleQuestionSelect: (questionId: string) => void;
   onToggleSelectAll: () => void;
   onClearSelection: () => void;
+  candidateNameById: Record<number, string>;
+  positionNameById: Record<number, string>;
 }
 
 const TYPE_MAP: Record<
@@ -41,6 +43,8 @@ export default function ResultsPanel({
   onToggleQuestionSelect,
   onToggleSelectAll,
   onClearSelection,
+  candidateNameById,
+  positionNameById,
 }: ResultsPanelProps) {
   const [editingIdx, setEditingIdx] = useState<number | null>(null);
   const [editedTexts, setEditedTexts] = useState<Record<number, string>>({});
@@ -165,6 +169,14 @@ export default function ResultsPanel({
               const isEditing = editingIdx === idx;
               const displayText = editedTexts[idx] ?? q.questionText;
               const isSelected = selectedQuestionIds.includes(q.id);
+              const candidateLabel =
+                candidateNameById[q.sourceCandidateId] ??
+                `지원자 #${q.sourceCandidateId}`;
+              const positionLabel =
+                q.sourcePositionId != null
+                  ? (positionNameById[q.sourcePositionId] ??
+                    `직무 #${q.sourcePositionId}`)
+                  : "직무 미지정";
 
               return (
                 <div
@@ -193,6 +205,14 @@ export default function ResultsPanel({
                       >
                         <i className={`bx ${typeInfo.icon} text-sm`} />
                         {typeInfo.label}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-600">
+                        <i className="bx bx-user" aria-hidden />
+                        {candidateLabel}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
+                        <i className="bx bx-briefcase" aria-hidden />
+                        {positionLabel}
                       </span>
                     </div>
                     <button
